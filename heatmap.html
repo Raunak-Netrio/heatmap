@@ -147,6 +147,26 @@
   #hourHeader th:nth-child(1) { left: 0;    z-index: 5; }
   #hourHeader th:nth-child(2) { left: 90px; z-index: 5; }
 
+  /* Compare mode */
+  .compare-toggle {
+    padding: 5px 14px; border: 1px solid #bbb; border-radius: 6px;
+    background: #fff; color: #444; cursor: pointer; font-size: 12px;
+    transition: all .15s; white-space: nowrap;
+  }
+  .compare-toggle:hover { border-color: #2c3e50; background: #eef0f3; }
+  .compare-toggle.active { background: #e67e22; color: #fff; border-color: #d35400; }
+  body.dark .compare-toggle { background: #181828; color: #c8d0e8; border-color: #3a3a5a; }
+  body.dark .compare-toggle.active { background: #e67e22; border-color: #d35400; color: #fff; }
+
+  .delta-badge { font-size: 7.5px; font-weight: 700; display: block; line-height: 1.1; }
+  td.delta-pos .delta-badge { color: #1a7a40; }
+  td.delta-neg .delta-badge { color: #c0392b; }
+  td.delta-same .delta-badge { color: #999; }
+  body.dark td.delta-pos .delta-badge { color: #4ade80; }
+  body.dark td.delta-neg .delta-badge { color: #f87171; }
+  body.dark td.delta-same .delta-badge { color: #555; }
+  body.compare-active td.heat { height: 34px; }
+
   /* Multi-select group picker */
   .multi-select { position: relative; min-width: 240px; }
   .ms-trigger {
@@ -347,6 +367,21 @@
       </div>
     </div>
   </div>
+  <div class="filter-group">
+    <label>Timezone</label>
+    <select id="tzSelect" onchange="setTimezone(this.value)">
+      <option value="0">ET (UTC−4)</option>
+      <option value="1">GMT (UTC+0)</option>
+      <option value="2">IST (UTC+5:30)</option>
+      <option value="3">CT (UTC−5)</option>
+      <option value="4">MT (UTC−6)</option>
+      <option value="5">PT (UTC−7)</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Compare</label>
+    <button id="compareBtn" class="compare-toggle" onclick="toggleCompare()">⚡ vs Prior Month</button>
+  </div>
 </div>
 
 <div class="upload-section">
@@ -375,7 +410,7 @@
   <thead>
     <tr>
       <th class="group-header" colspan="2">Date</th>
-      <th class="group-header" colspan="24">Hour (EST)</th>
+      <th class="group-header" colspan="24" id="hourTzLabel">Hour (ET)</th>
     </tr>
     <tr id="hourHeader">
       <th>Day</th>
@@ -816,13 +851,65 @@ function setMonth(m) {
   render();
 }
 
-// ── Build hour header once ────────────────────────────────────────────────
-const hourHeader = document.getElementById('hourHeader');
-for (let h = 1; h <= 24; h++) {
-  const th = document.createElement('th');
-  th.textContent = h - 1;
-  hourHeader.appendChild(th);
+// ── Timezone & Compare ────────────────────────────────────────────────────
+const TIMEZONES = [
+  { label: 'ET (UTC−4)',   abbr: 'ET',  offsetMins: 0    },
+  { label: 'GMT (UTC+0)',  abbr: 'GMT', offsetMins: 240  },
+  { label: 'IST (UTC+5:30)', abbr: 'IST', offsetMins: 570 },
+  { label: 'CT (UTC−5)',   abbr: 'CT',  offsetMins: -60  },
+  { label: 'MT (UTC−6)',   abbr: 'MT',  offsetMins: -120 },
+  { label: 'PT (UTC−7)',   abbr: 'PT',  offsetMins: -180 },
+];
+let currentTZIdx = 0;
+let compareMode  = false;
+
+function tzHourLabel(h) {
+  const totalMins = (h - 1) * 60 + TIMEZONES[currentTZIdx].offsetMins;
+  const norm = ((totalMins % 1440) + 1440) % 1440;
+  const dispH = Math.floor(norm / 60);
+  const dispM = norm % 60;
+  return dispM === 0 ? String(dispH) : `${dispH}:${String(dispM).padStart(2,'0')}`;
 }
+
+function tzDisp(h) {
+  const lbl = tzHourLabel(h);
+  return `${lbl.includes(':') ? lbl : lbl + ':00'} ${TIMEZONES[currentTZIdx].abbr}`;
+}
+
+function toPriorDateKey(dk) {
+  const [y, m, d] = dk.split('-').map(Number);
+  if (currentMonth === 'all') return `${y - 1}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const pm = m === 1 ? 12 : m - 1;
+  const py = m === 1 ? y - 1 : y;
+  return `${py}-${String(pm).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+function setTimezone(val) {
+  currentTZIdx = parseInt(val);
+  rebuildHourHeader();
+  document.getElementById('hourTzLabel').textContent = `Hour (${TIMEZONES[currentTZIdx].abbr})`;
+  render();
+}
+
+function toggleCompare() {
+  compareMode = !compareMode;
+  document.getElementById('compareBtn').classList.toggle('active', compareMode);
+  document.body.classList.toggle('compare-active', compareMode);
+  render();
+}
+
+// ── Build hour header ─────────────────────────────────────────────────────
+const hourHeader = document.getElementById('hourHeader');
+function rebuildHourHeader() {
+  // remove old hour cells (keep first two: Day, Date)
+  while (hourHeader.children.length > 2) hourHeader.removeChild(hourHeader.lastChild);
+  for (let h = 1; h <= 24; h++) {
+    const th = document.createElement('th');
+    th.textContent = tzHourLabel(h);
+    hourHeader.appendChild(th);
+  }
+}
+rebuildHourHeader();
 
 // ── Legend ────────────────────────────────────────────────────────────────
 const legendBar = document.getElementById('legendBar');
@@ -967,10 +1054,10 @@ function render() {
           tooltip.style.display = 'block';
           const a = dA[h] || 0;
           if (a === 0) {
-            tooltip.textContent = `${label} · ${day} · Hour ${h-1} EST: No availability data`;
+            tooltip.textContent = `${label} · ${day} · ${tzDisp(h)}: No availability data`;
           } else {
             const OR2 = (dO[String(h)] || 0) / a, RR2 = (dR[String(h)] || 0) / a;
-            tooltip.textContent = `${label} · ${day} · Hour ${h-1} EST — OR: ${OR2.toFixed(2)}, RR: ${RR2.toFixed(2)} (${a} staff on shift)`;
+            tooltip.textContent = `${label} · ${day} · ${tzDisp(h)} — OR: ${OR2.toFixed(2)}, RR: ${RR2.toFixed(2)} (${a} staff on shift)`;
           }
         });
         td.addEventListener('mousemove', e => {
@@ -986,7 +1073,11 @@ function render() {
         const count = d[String(h)] || 0;
         const td = document.createElement('td');
         const isPeak = count > 0 && key === peakCellKey && h === peakCellH;
-        td.className = 'heat' + (count === 0 ? ' empty' : '') + (isPeak ? ' peak-cell' : '');
+        const priorCount = (compareMode && !isAvail) ? ((groupData[toPriorDateKey(key)] || {})[String(h)] || 0) : 0;
+        const delta = count - priorCount;
+        let deltaClass = '';
+        if (compareMode && !isAvail) deltaClass = delta > 0 ? ' delta-pos' : delta < 0 ? ' delta-neg' : ' delta-same';
+        td.className = 'heat' + (count === 0 ? ' empty' : '') + (isPeak ? ' peak-cell' : '') + deltaClass;
         if (count > 0) {
           td.style.background = getColor(count, globalMax);
           td.style.color = getTextColor(count, globalMax);
@@ -994,11 +1085,20 @@ function render() {
           td.classList.add('clickable');
           td.addEventListener('click', () => showDetailModal(key, h, label, day));
         }
+        if (compareMode && !isAvail) {
+          const badge = document.createElement('span');
+          badge.className = 'delta-badge';
+          badge.textContent = delta > 0 ? `▲${delta}` : delta < 0 ? `▼${Math.abs(delta)}` : '=';
+          td.appendChild(badge);
+        }
         td.addEventListener('mouseenter', e => {
           tooltip.style.display = 'block';
-          tooltip.textContent = isAvail
-            ? `${label} · ${day} · Hour ${h-1} EST: ${count} staff on shift`
-            : `${label} · ${day} · Hour ${h-1} EST: ${count} case${count !== 1 ? 's' : ''}`;
+          const base = isAvail
+            ? `${label} · ${day} · ${tzDisp(h)}: ${count} staff on shift`
+            : `${label} · ${day} · ${tzDisp(h)}: ${count} case${count !== 1 ? 's' : ''}`;
+          tooltip.textContent = (compareMode && !isAvail)
+            ? `${base} (prior: ${priorCount}, Δ${delta >= 0 ? '+' : ''}${delta})`
+            : base;
         });
         td.addEventListener('mousemove', e => {
           tooltip.style.left = (e.clientX + 12) + 'px';
@@ -1034,8 +1134,8 @@ function render() {
         tooltip.style.display = 'block';
         const a = hrAv[h] || 0;
         tooltip.textContent = a === 0
-          ? `Hour ${h-1} EST: No availability data`
-          : `Hour ${h-1} EST avg — OR: ${(hrOp[h]/a).toFixed(2)}, RR: ${(hrRv[h]/a).toFixed(2)}`;
+          ? `${tzDisp(h)}: No availability data`
+          : `${tzDisp(h)} avg — OR: ${(hrOp[h]/a).toFixed(2)}, RR: ${(hrRv[h]/a).toFixed(2)}`;
       });
       td.addEventListener('mousemove', e => {
         tooltip.style.left = (e.clientX + 12) + 'px';
@@ -1058,8 +1158,8 @@ function render() {
       td.addEventListener('mouseenter', () => {
         tooltip.style.display = 'block';
         tooltip.textContent = isAvail
-          ? `Hour ${h-1} EST total: ${v} staff-hours`
-          : `Hour ${h-1} EST total: ${v} cases`;
+          ? `${tzDisp(h)} total: ${v} staff-hours`
+          : `${tzDisp(h)} total: ${v} cases`;
       });
       td.addEventListener('mousemove', e => {
         tooltip.style.left = (e.clientX + 12) + 'px';
@@ -1138,7 +1238,7 @@ function showDetailModal(date, hour, label, day) {
   const groups = isAllGroups() ? GROUPS : selectedGroups;
   const modeLabel = isAvail ? 'Staff on Shift' : 'Cases Resolved';
 
-  let html = `<div class="modal-header"><span>${label} &middot; ${day} &middot; Hour ${hour-1} EST &mdash; ${modeLabel}</span><button onclick="closeModal()">&#x2715;</button></div>`;
+  let html = `<div class="modal-header"><span>${label} &middot; ${day} &middot; ${tzDisp(hour)} &mdash; ${modeLabel}</span><button onclick="closeModal()">&#x2715;</button></div>`;
 
   for (const grp of groups) {
     if (groups.length > 1) {

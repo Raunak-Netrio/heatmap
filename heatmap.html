@@ -147,6 +147,38 @@
   #hourHeader th:nth-child(1) { left: 0;    z-index: 5; }
   #hourHeader th:nth-child(2) { left: 90px; z-index: 5; }
 
+  /* Multi-select group picker */
+  .multi-select { position: relative; min-width: 240px; }
+  .ms-trigger {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 10px; border: 1px solid #bbb; border-radius: 6px;
+    background: #fff; color: #333; cursor: pointer; font-size: 12px; user-select: none;
+  }
+  .ms-trigger:hover { border-color: #2c3e50; }
+  .ms-arrow { font-size: 10px; color: #888; transition: transform .15s; margin-left: 6px; }
+  .multi-select.open .ms-arrow { transform: rotate(180deg); }
+  .ms-dropdown {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid #bbb; border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15); z-index: 500; padding: 4px 0; min-width: 220px;
+  }
+  .multi-select.open .ms-dropdown { display: block; }
+  .ms-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; cursor: pointer; font-size: 12px; color: #333;
+    transition: background .1s;
+  }
+  .ms-item:hover { background: #f0f4f8; }
+  .ms-item input[type=checkbox] { cursor: pointer; accent-color: #2c3e50; width: 13px; height: 13px; }
+  .ms-item.all-item { border-bottom: 1px solid #e0e0e0; font-weight: 600; margin-bottom: 2px; }
+
+  body.dark .ms-trigger { background: #181828; border-color: #3a3a5a; color: #c8d0e8; }
+  body.dark .ms-trigger:hover { border-color: #5a6a9a; }
+  body.dark .ms-dropdown { background: #181828; border-color: #3a3a5a; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+  body.dark .ms-item { color: #c8d0e8; }
+  body.dark .ms-item:hover { background: #242438; }
+  body.dark .ms-item.all-item { border-bottom-color: #2a2a42; }
+
   /* Upload section */
   .upload-section {
     display: flex; gap: 12px; justify-content: center; align-items: center;
@@ -286,13 +318,34 @@
   </div>
   <div class="filter-group">
     <label>Assignment Group</label>
-    <select id="groupSelect" onchange="setGroup(this.value)">
-      <option value="All">All Groups</option>
-      <option value="Netrio - End User Engineering [AgioNow]">Netrio - End User Engineering</option>
-      <option value="Netrio - Endpoint Experience [AgioNow]">Netrio - Endpoint Experience</option>
-      <option value="Netrio - Help Desk [AgioNow]">Netrio - Help Desk</option>
-      <option value="Netrio - Help Desk Technical Support [AgioNow]">Netrio - Help Desk Technical Support</option>
-    </select>
+    <div class="multi-select" id="groupMulti">
+      <div class="ms-trigger" onclick="toggleMS()">
+        <span id="msLabel">All Groups</span>
+        <span class="ms-arrow">▾</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdown">
+        <label class="ms-item all-item">
+          <input type="checkbox" id="cbAll" checked onchange="onCbAllChange(this)">
+          <span>All Groups</span>
+        </label>
+        <label class="ms-item">
+          <input type="checkbox" class="cb-grp" value="Netrio - Help Desk [AgioNow]" onchange="onCbGrpChange()">
+          <span>Help Desk</span>
+        </label>
+        <label class="ms-item">
+          <input type="checkbox" class="cb-grp" value="Netrio - Help Desk Technical Support [AgioNow]" onchange="onCbGrpChange()">
+          <span>Help Desk Technical Support</span>
+        </label>
+        <label class="ms-item">
+          <input type="checkbox" class="cb-grp" value="Netrio - End User Engineering [AgioNow]" onchange="onCbGrpChange()">
+          <span>End User Engineering</span>
+        </label>
+        <label class="ms-item">
+          <input type="checkbox" class="cb-grp" value="Netrio - Endpoint Experience [AgioNow]" onchange="onCbGrpChange()">
+          <span>Endpoint Experience</span>
+        </label>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -662,7 +715,7 @@ function getTextColor(count, max) {
 
 // ── State ─────────────────────────────────────────────────────────────────
 let currentType  = 'opened';
-let currentGroup = 'All';
+let selectedGroups = ['All'];
 let currentMonth = '6';
 
 function setType(t) {
@@ -684,9 +737,78 @@ function setType(t) {
   }
   render();
 }
+function isAllGroups() {
+  return selectedGroups[0] === 'All' || selectedGroups.length === GROUPS.length;
+}
+
+function mergeGroupData(src) {
+  if (isAllGroups()) return src['All'] || {};
+  const merged = {};
+  for (const grp of selectedGroups) {
+    for (const [dk, hours] of Object.entries(src[grp] || {})) {
+      if (!merged[dk]) merged[dk] = {};
+      for (const [hk, v] of Object.entries(hours)) {
+        merged[dk][hk] = (merged[dk][hk] || 0) + v;
+      }
+    }
+  }
+  return merged;
+}
+
 function setGroup(g) {
-  currentGroup = g;
+  if (g === 'All') {
+    selectedGroups = ['All'];
+    document.getElementById('cbAll').checked = true;
+    document.querySelectorAll('.cb-grp').forEach(c => { c.checked = false; });
+  } else {
+    selectedGroups = [g];
+    document.getElementById('cbAll').checked = false;
+    document.querySelectorAll('.cb-grp').forEach(c => { c.checked = c.value === g; });
+  }
+  updateMsLabel();
   render();
+}
+
+function toggleMS() {
+  document.getElementById('groupMulti').classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+  const el = document.getElementById('groupMulti');
+  if (el && !el.contains(e.target)) el.classList.remove('open');
+});
+
+function onCbAllChange(cb) {
+  if (!cb.checked) { cb.checked = true; return; }
+  document.querySelectorAll('.cb-grp').forEach(c => { c.checked = false; });
+  selectedGroups = ['All'];
+  updateMsLabel();
+  render();
+}
+
+function onCbGrpChange() {
+  const checked = [...document.querySelectorAll('.cb-grp:checked')].map(c => c.value);
+  const cbAll = document.getElementById('cbAll');
+  if (checked.length === 0) {
+    cbAll.checked = true;
+    selectedGroups = ['All'];
+  } else {
+    cbAll.checked = false;
+    selectedGroups = checked;
+  }
+  updateMsLabel();
+  render();
+}
+
+function updateMsLabel() {
+  const el = document.getElementById('msLabel');
+  if (isAllGroups()) {
+    el.textContent = 'All Groups';
+  } else if (selectedGroups.length === 1) {
+    el.textContent = selectedGroups[0].replace('Netrio - ', '').replace(' [AgioNow]', '');
+  } else {
+    el.textContent = `${selectedGroups.length} Groups selected`;
+  }
 }
 function setMonth(m) {
   currentMonth = m;
@@ -721,10 +843,10 @@ function render() {
   document.getElementById('heatTable').classList.toggle('ratio-mode', isRatio);
 
   // Data sources
-  const groupData    = (!isRatio && !isAvail) ? (DATA[currentType][currentGroup] || {}) : null;
-  const availForCalc = (isRatio || isAvail)   ? (AVAIL[currentGroup] || {}) : null;
-  const openedData   = isRatio ? (DATA['opened'][currentGroup]   || {}) : null;
-  const resolvedData = isRatio ? (DATA['resolved'][currentGroup] || {}) : null;
+  const groupData    = (!isRatio && !isAvail) ? mergeGroupData(DATA[currentType]) : null;
+  const availForCalc = (isRatio || isAvail)   ? mergeGroupData(AVAIL)            : null;
+  const openedData   = isRatio ? mergeGroupData(DATA['opened'])                   : null;
+  const resolvedData = isRatio ? mergeGroupData(DATA['resolved'])                 : null;
 
   // ── First pass: stats ───────────────────────────────────────────────────
   let globalMax = 1;
@@ -950,7 +1072,7 @@ function render() {
   tbody.appendChild(trTot);
 
   // ── Group breakdown (All view only) ────────────────────────────────────
-  if (currentGroup === 'All' && !isRatio) {
+  if (isAllGroups() && !isRatio) {
     const trHdr = document.createElement('tr');
     trHdr.className = 'grp-breakdown-hdr';
     const tdHdr = document.createElement('td');
@@ -997,10 +1119,7 @@ function render() {
         trG.appendChild(td);
       }
 
-      trG.addEventListener('click', () => {
-        document.getElementById('groupSelect').value = grp;
-        setGroup(grp);
-      });
+      trG.addEventListener('click', () => setGroup(grp));
 
       tbody.appendChild(trG);
     }
@@ -1016,13 +1135,13 @@ const GROUPS = [
 
 function showDetailModal(date, hour, label, day) {
   const isAvail = currentType === 'avail';
-  const groups = currentGroup === 'All' ? GROUPS : [currentGroup];
+  const groups = isAllGroups() ? GROUPS : selectedGroups;
   const modeLabel = isAvail ? 'Staff on Shift' : 'Cases Resolved';
 
   let html = `<div class="modal-header"><span>${label} &middot; ${day} &middot; Hour ${hour-1} EST &mdash; ${modeLabel}</span><button onclick="closeModal()">&#x2715;</button></div>`;
 
   for (const grp of groups) {
-    if (currentGroup === 'All') {
+    if (groups.length > 1) {
       html += `<div class="modal-group-header">${grp}</div>`;
     }
     if (isAvail) {

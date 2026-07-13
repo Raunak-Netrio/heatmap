@@ -3110,10 +3110,18 @@ function parseServiceNowRows(rows) {
   if (!rows.length) throw new Error('Empty spreadsheet');
   const cols = Object.keys(rows[0]);
   const findCol = (...terms) => cols.find(c => terms.some(t => c.toLowerCase().includes(t.toLowerCase())));
-  const openedCol   = findCol('opened','created','open date','open_at','sys_created');
-  const resolvedCol = findCol('resolved','closed','resolve');
-  const groupCol    = findCol('assignment group','assignment_group','group','team','queue');
+  const openedCol = findCol('opened at','opened_at','open date','open_at','sys_created','opened','created');
+  // Prioritise datetime columns; explicitly exclude person/note columns (resolved by, resolver, notes)
+  const resolvedCol = findCol('resolved at','resolved_at','resolve date','closed at','closed_at','resolve_at','resolution date')
+    || cols.find(c => {
+         const lc = c.toLowerCase();
+         return (lc.includes('resolved') || lc.includes('closed') || lc.includes('resolve'))
+           && !lc.includes('by') && !lc.includes('note') && !lc.includes('comment') && !lc.includes('code') && !lc.includes('reason');
+       });
+  const groupCol = findCol('assignment group','assignment_group','group','team','queue');
   if (!openedCol) throw new Error('Cannot find Opened column');
+  console.log('[upload] cols:', cols.join(' | '));
+  console.log('[upload] openedCol:', openedCol, '| resolvedCol:', resolvedCol, '| groupCol:', groupCol);
 
   const GROUP_MAP = {
     'netrio - help desk [agionow]':                   'Netrio - Help Desk [AgioNow]',

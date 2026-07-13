@@ -165,6 +165,87 @@
   .upload-label.loading { border-color: #2980b9; background: #eaf3fb; color: #2471a3; border-style: solid; animation: upPulse 1s ease-in-out infinite; }
   @keyframes upPulse { 0%,100%{opacity:1} 50%{opacity:.55} }
   .upload-label input[type=file] { display: none; }
+
+  /* Dark mode toggle */
+  #darkToggle {
+    position: fixed; top: 12px; right: 16px; z-index: 200;
+    background: #2c3e50; color: #ecf0f1; border: none; border-radius: 20px;
+    padding: 5px 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: background .2s; box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  }
+  #darkToggle:hover { background: #3d5166; }
+
+  /* No-data row dimming */
+  tr.no-data-row td.day-cell,
+  tr.no-data-row td.date-cell { opacity: 0.35; }
+
+  /* Peak cell callout */
+  td.heat.peak-cell { outline: 2px solid #f39c12 !important; position: relative; z-index: 1; }
+  td.heat.peak-cell::before {
+    content: '★'; position: absolute; top: 0; right: 1px;
+    font-size: 7px; color: #f39c12; line-height: 1; pointer-events: none;
+  }
+
+  /* Group breakdown rows */
+  tr.grp-breakdown-hdr td {
+    background: #eef; color: #888; font-size: 10px; font-style: italic;
+    text-align: center; padding: 3px; border-top: 2px solid #c8c8e0; cursor: default;
+  }
+  tr.grp-filter-row { cursor: pointer; }
+  tr.grp-filter-row:hover td { background: #f0f4f8 !important; }
+  td.grp-filter-name {
+    background: #34495e !important; color: #ecf0f1 !important;
+    font-weight: 700; font-size: 10px; text-align: left; padding: 3px 8px;
+  }
+  tr.grp-filter-row:hover td.grp-filter-name { background: #3d5166 !important; }
+  td.grp-filter-bar {
+    background: #f8f9fa; color: #333; font-size: 10px; font-weight: 600; text-align: left; padding: 3px 8px;
+  }
+
+  /* ── Dark mode ── */
+  body.dark { background: #12121f; color: #dde; }
+  body.dark h2 { color: #ecf0f1; }
+  body.dark p.subtitle { color: #888; }
+  body.dark .filter-group label { color: #999; }
+  body.dark .btn-group { border-color: #444; }
+  body.dark .btn-group button { background: #1e1e2e; color: #bbb; border-right-color: #444; }
+  body.dark .btn-group button.active { background: #3a80d2; color: #fff; }
+  body.dark .btn-group button:hover:not(.active) { background: #2a2a3e; }
+  body.dark select { background: #1e1e2e; color: #ccc; border-color: #444; }
+  body.dark table { background: #1a1a2a; box-shadow: 0 1px 6px rgba(0,0,0,.5); }
+  body.dark th, body.dark td { border-color: #333; }
+  body.dark thead th { background: #16213e; }
+  body.dark td.day-cell { background: #1c2d40; color: #a8bcd0; }
+  body.dark td.date-cell { background: #1c2d40; color: #7090a8; }
+  body.dark td.heat.empty { background: #1f1f30; }
+  body.dark tr.weekend td.day-cell,
+  body.dark tr.weekend td.date-cell { background: #2a1535; color: #c0a8d0; }
+  body.dark tr.summary-row td { background: #1f1f35; color: #a8c0d8; }
+  body.dark tr.summary-row td.day-cell,
+  body.dark tr.summary-row td.date-cell { background: #16213e; color: #ecf0f1; }
+  body.dark tr.no-data-row td.day-cell,
+  body.dark tr.no-data-row td.date-cell { opacity: 0.25; }
+  body.dark .total-badge { background: #16213e; }
+  body.dark .legend { color: #aaa; }
+  body.dark .upload-label { background: #1e1e2e; border-color: #444; color: #888; }
+  body.dark .upload-label:hover { background: #252535; border-color: #666; color: #ccc; }
+  body.dark .upload-label.success { background: #0d2e1e; border-color: #27ae60; color: #2ecc71; }
+  body.dark .upload-label.error { background: #2e0d0d; border-color: #c0392b; color: #e74c3c; }
+  body.dark #modal { background: rgba(0,0,0,.7); }
+  body.dark #modalBox { background: #1a1a2a; color: #dde; }
+  body.dark .modal-header { color: #5a9fff; border-bottom-color: #3a6aaa; }
+  body.dark .modal-header button { color: #666; }
+  body.dark .modal-header button:hover { color: #ccc; }
+  body.dark .modal-group-header { color: #5a9fff; border-bottom-color: #253a5e; }
+  body.dark .modal-analyst { color: #bbb; border-bottom-color: #2a2a3a; }
+  body.dark .modal-empty { color: #555; }
+  body.dark tr.grp-breakdown-hdr td { background: #1c1c30; color: #666; border-top-color: #333; }
+  body.dark tr.grp-filter-row:hover td { background: #22223a !important; }
+  body.dark td.grp-filter-name { background: #16213e !important; color: #a8c8f0 !important; }
+  body.dark tr.grp-filter-row:hover td.grp-filter-name { background: #1e2e50 !important; }
+  body.dark td.grp-filter-bar { background: #1a1a2a; color: #aaa; }
+  body.dark #darkToggle { background: #3a80d2; }
+  body.dark #darkToggle:hover { background: #4a90e2; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -177,6 +258,7 @@
   </div>
 </div>
 
+<button id="darkToggle" onclick="toggleDark()">🌙 Dark</button>
 <h2>Cases Heatmap – 2026 Year to Date</h2>
 <p class="subtitle">Count of cases per hour (Eastern Time · UTC−4). Hover a cell for details.</p>
 
@@ -2822,6 +2904,8 @@ function render() {
   let peakDayKey = null, peakDayVal = 0;
   let peakHourKey = null, peakHourVal = 0;
   let grandTotal = 0;
+  const emptyDates = new Set();
+  let peakCellKey = null, peakCellH = 0, peakCellVal = 0;
 
   // Ratio accumulators
   const hrOp = {}, hrRv = {}, hrAv = {};
@@ -2851,6 +2935,7 @@ function render() {
       for (let h = 1; h <= 24; h++) {
         const v = d[String(h)] || 0;
         if (v > globalMax) globalMax = v;
+        if (v > peakCellVal) { peakCellVal = v; peakCellKey = key; peakCellH = h; }
         hourTotals[h] = (hourTotals[h] || 0) + v;
         if (hourTotals[h] > peakHourVal) { peakHourVal = hourTotals[h]; peakHourKey = String(h); }
         daySum += v;
@@ -2858,6 +2943,7 @@ function render() {
       dayTotals[key] = daySum;
       grandTotal += daySum;
       if (daySum > peakDayVal) { peakDayVal = daySum; peakDayKey = key; }
+      if (daySum === 0) emptyDates.add(key);
     }
   });
 
@@ -2902,7 +2988,10 @@ function render() {
 
   DATES.forEach(({ day, label, key, isWeekend }) => {
     const tr = document.createElement('tr');
-    if (isWeekend) tr.className = 'weekend';
+    const rowClasses = [];
+    if (isWeekend) rowClasses.push('weekend');
+    if (emptyDates.has(key)) rowClasses.push('no-data-row');
+    if (rowClasses.length) tr.className = rowClasses.join(' ');
     const tdDay  = document.createElement('td'); tdDay.className  = 'day-cell';  tdDay.textContent  = day;
     const tdDate = document.createElement('td'); tdDate.className = 'date-cell'; tdDate.textContent = label;
     tr.appendChild(tdDay);
@@ -2946,7 +3035,8 @@ function render() {
       for (let h = 1; h <= 24; h++) {
         const count = d[String(h)] || 0;
         const td = document.createElement('td');
-        td.className = 'heat' + (count === 0 ? ' empty' : '');
+        const isPeak = count > 0 && key === peakCellKey && h === peakCellH;
+        td.className = 'heat' + (count === 0 ? ' empty' : '') + (isPeak ? ' peak-cell' : '');
         if (count > 0) {
           td.style.background = getColor(count, globalMax);
           td.style.color = getTextColor(count, globalMax);
@@ -3030,6 +3120,63 @@ function render() {
     }
   }
   tbody.appendChild(trTot);
+
+  // ── Group breakdown (All view only) ────────────────────────────────────
+  if (currentGroup === 'All' && !isRatio) {
+    const trHdr = document.createElement('tr');
+    trHdr.className = 'grp-breakdown-hdr';
+    const tdHdr = document.createElement('td');
+    tdHdr.colSpan = 26;
+    tdHdr.textContent = 'Click a group row to zoom in ↓';
+    trHdr.appendChild(tdHdr);
+    tbody.appendChild(trHdr);
+
+    const shortName = g => g.replace('Netrio - ', '').replace(' [AgioNow]', '');
+
+    for (const grp of GROUPS) {
+      const gSrc = isAvail ? (AVAIL[grp] || {}) : (DATA[currentType][grp] || {});
+      const hourCounts = {};
+      let gTotal = 0;
+      DATES.forEach(({ key }) => {
+        const d = gSrc[key] || {};
+        for (let h = 1; h <= 24; h++) {
+          const v = isAvail ? (d[h] || 0) : (d[String(h)] || 0);
+          hourCounts[h] = (hourCounts[h] || 0) + v;
+          gTotal += v;
+        }
+      });
+
+      const trG = document.createElement('tr');
+      trG.className = 'grp-filter-row';
+      trG.title = `Click to filter to ${grp}`;
+
+      const tdName = document.createElement('td');
+      tdName.className = 'grp-filter-name';
+      tdName.colSpan = 2;
+      tdName.textContent = shortName(grp);
+      trG.appendChild(tdName);
+
+      const gMax = Math.max(...Object.values(hourCounts), 1);
+      for (let h = 1; h <= 24; h++) {
+        const v = hourCounts[h] || 0;
+        const td = document.createElement('td');
+        td.className = 'heat grp-filter-bar' + (v === 0 ? ' empty' : '');
+        if (v > 0) {
+          td.style.background = getColor(v, gMax);
+          td.style.color = getTextColor(v, gMax);
+          td.textContent = v;
+        }
+        trG.appendChild(td);
+      }
+
+      trG.addEventListener('click', () => {
+        document.getElementById('groupSelect').value = grp;
+        setGroup(grp);
+      });
+
+      tbody.appendChild(trG);
+    }
+  }
 }
 
 const GROUPS = [
@@ -3508,6 +3655,19 @@ function restoreUploads() {
     }
   } catch(e) { console.warn('localStorage avail restore failed:', e); }
 }
+
+// ── Dark mode ─────────────────────────────────────────────────────────────
+let isDark = localStorage.getItem('hm_dark') === '1';
+function applyDark() {
+  document.body.classList.toggle('dark', isDark);
+  document.getElementById('darkToggle').textContent = isDark ? '☀️ Light' : '🌙 Dark';
+}
+function toggleDark() {
+  isDark = !isDark;
+  localStorage.setItem('hm_dark', isDark ? '1' : '0');
+  applyDark();
+}
+applyDark();
 
 restoreUploads();
 render();

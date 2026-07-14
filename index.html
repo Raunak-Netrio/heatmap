@@ -11,23 +11,21 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 
 /* Header */
 .page-header {
-  background: #1e2d3d; padding: 0 20px; height: 52px;
+  background: #2B3032; padding: 0 20px; height: 52px;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   position: sticky; top: 0; z-index: 100;
-  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand-logo {
-  width: 32px; height: 32px; background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
-  border-radius: 7px; display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 900; color: #fff; flex-shrink: 0; letter-spacing: -1px;
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-logo-img {
+  height: 30px; width: auto; flex-shrink: 0;
+  background: #fff; border-radius: 5px; padding: 2px 8px;
 }
-.brand-name { font-size: 13px; font-weight: 700; color: #e0ecf8; letter-spacing: .2px; }
-.brand-sub { font-size: 10.5px; color: #5a80a0; margin-top: 1px; }
+.brand-sub { font-size: 10.5px; color: #8A9898; }
 .header-right { display: flex; align-items: center; gap: 8px; }
 #darkToggle {
   background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
-  color: #90b8d8; border-radius: 6px; padding: 0 12px; height: 28px;
+  color: #C8A060; border-radius: 6px; padding: 0 12px; height: 28px;
   cursor: pointer; font-size: 12px; font-weight: 500; font-family: inherit;
   transition: all .15s; white-space: nowrap;
 }
@@ -61,8 +59,8 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   transition: background .12s, color .12s; white-space: nowrap;
 }
 .btn-group button:not(:last-child) { border-right: 1px solid #d0d5dd; }
-.btn-group button.active { background: #1e2d3d; color: #fff; font-weight: 600; }
-.btn-group button:hover:not(.active) { background: #f4f6f8; }
+.btn-group button.active { background: #E06820; color: #fff; font-weight: 600; }
+.btn-group button:hover:not(.active) { background: #fff8f4; }
 
 select {
   height: 30px; padding: 0 8px;
@@ -70,7 +68,7 @@ select {
   background: #fff; color: #2d3748; cursor: pointer;
   font-size: 12px; font-family: inherit;
 }
-select:hover { border-color: #1e2d3d; }
+select:hover { border-color: #E06820; }
 
 .compare-toggle {
   height: 30px; padding: 0 12px;
@@ -78,8 +76,8 @@ select:hover { border-color: #1e2d3d; }
   background: #fff; color: #4a5568; cursor: pointer;
   font-size: 12px; font-family: inherit; transition: all .12s; white-space: nowrap;
 }
-.compare-toggle:hover { border-color: #1e2d3d; background: #f4f6f8; }
-.compare-toggle.active { background: #e67e22; color: #fff; border-color: #ca6f1e; font-weight: 600; }
+.compare-toggle:hover { border-color: #E06820; background: #fff8f4; }
+.compare-toggle.active { background: #E06820; color: #fff; border-color: #C05010; font-weight: 600; }
 
 .upload-label {
   display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px;
@@ -87,7 +85,7 @@ select:hover { border-color: #1e2d3d; }
   cursor: pointer; font-size: 11.5px; font-family: inherit;
   color: #6b7a8d; transition: all .12s; white-space: nowrap; user-select: none;
 }
-.upload-label:hover { border-color: #1e2d3d; background: #f0f4f8; color: #1e2d3d; border-style: solid; }
+.upload-label:hover { border-color: #E06820; background: #fff8f4; color: #C05010; border-style: solid; }
 .upload-label.success { border-style: solid; border-color: #27ae60; background: #f0fdf4; color: #1a7a40; }
 .upload-label.error   { border-style: solid; border-color: #e74c3c; background: #fff5f5; color: #c0392b; }
 .upload-label.loading { border-style: solid; border-color: #3498db; background: #eff8ff; color: #2471a3; animation: upPulse 1s ease-in-out infinite; }
@@ -110,7 +108,7 @@ select:hover { border-color: #1e2d3d; }
   font-size: 9px; font-weight: 700; color: #8a9ab0;
   text-transform: uppercase; letter-spacing: .6px;
 }
-.stat-value { font-size: 13px; font-weight: 700; color: #1e2d3d; white-space: nowrap; }
+.stat-value { font-size: 13px; font-weight: 700; color: #2B3032; white-space: nowrap; }
 
 /* Content area */
 .content-area { padding: 14px 20px 20px; }
@@ -129,26 +127,26 @@ table {
   width: 100%; table-layout: fixed;
 }
 th, td { border: 1px solid #e0e5ec; text-align: center; padding: 0; }
-thead th { background: #1e2d3d; color: #8aaac8; font-weight: 600; padding: 5px 4px; }
-thead th.group-header { font-size: 11.5px; letter-spacing: .4px; color: #c8d8e8; }
+thead th { background: #2B3032; color: #A0AAAA; font-weight: 600; padding: 5px 4px; }
+thead th.group-header { font-size: 11.5px; letter-spacing: .4px; color: #C8D0D0; }
 
 td.day-cell {
-  background: #263545; color: #d8e8f4; font-weight: 600;
+  background: #2C3335; color: #D8E4E4; font-weight: 600;
   padding: 4px 8px; text-align: left; min-width: 78px; font-size: 11px;
 }
 td.date-cell {
-  background: #263545; color: #6a8aaa; min-width: 58px;
+  background: #2C3335; color: #8A9898; min-width: 58px;
   padding: 4px 6px; font-size: 10.5px;
 }
 td.heat {
   width: 32px; min-width: 32px; height: 26px;
   font-size: 10px; font-weight: 600; cursor: default; transition: opacity .12s;
 }
-td.heat:hover { outline: 2px solid #1e2d3d; z-index: 1; position: relative; background: #1e2d3d !important; color: #fff !important; }
+td.heat:hover { outline: 2px solid #E06820; z-index: 1; position: relative; background: #E06820 !important; color: #fff !important; }
 td.heat.empty { background: #f4f6f9; }
-tr.weekend td.day-cell, tr.weekend td.date-cell { background: #3d1d52; color: #d0bce8; }
+tr.weekend td.day-cell, tr.weekend td.date-cell { background: #3A2218; color: #F8C898; }
 tr.summary-row td { background: #f4f6f8; font-weight: 700; font-size: 10px; color: #2d3748; }
-tr.summary-row td.day-cell, tr.summary-row td.date-cell { background: #1e2d3d; color: #c8d8e8; }
+tr.summary-row td.day-cell, tr.summary-row td.date-cell { background: #2B3032; color: #C8D4D4; }
 
 /* Legend */
 .legend {
@@ -183,11 +181,11 @@ tr.summary-row td.day-cell, tr.summary-row td.date-cell { background: #1e2d3d; c
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
   font-weight: 700; margin-bottom: 14px; font-size: 13px;
-  padding-bottom: 10px; border-bottom: 2px solid #1e2d3d; color: #1e2d3d;
+  padding-bottom: 10px; border-bottom: 2px solid #E06820; color: #2B3032;
 }
 .modal-header button { background: none; border: none; cursor: pointer; font-size: 18px; color: #8a9ab0; line-height: 1; }
 .modal-header button:hover { color: #2d3748; }
-.modal-group-header { font-weight: 700; color: #2563c0; margin: 14px 0 6px; font-size: 12px; letter-spacing: .3px; border-bottom: 1px solid #dce8f8; padding-bottom: 4px; }
+.modal-group-header { font-weight: 700; color: #E06820; margin: 14px 0 6px; font-size: 12px; letter-spacing: .3px; border-bottom: 1px solid #F8DEC8; padding-bottom: 4px; }
 .modal-analyst { padding: 4px 6px; font-size: 12px; color: #2d3748; border-bottom: 1px solid #f4f6f8; }
 .modal-analyst:last-child { border-bottom: none; }
 .modal-empty { color: #b0bec8; font-style: italic; font-size: 12px; padding: 4px 6px; }
@@ -230,7 +228,7 @@ tr.no-data-row td.day-cell, tr.no-data-row td.date-cell { opacity: 0.35; }
 tr.grp-breakdown-hdr td { background: #f4f6f8; color: #8a9ab0; font-size: 10px; font-style: italic; text-align: center; padding: 3px; border-top: 2px solid #dce1e9; }
 tr.grp-filter-row { cursor: pointer; }
 tr.grp-filter-row:hover td { background: #f0f4f8 !important; }
-td.grp-filter-name { background: #263545 !important; color: #d8e8f4 !important; font-weight: 700; font-size: 10px; text-align: left; padding: 3px 8px; }
+td.grp-filter-name { background: #2C3335 !important; color: #D8E4E4 !important; font-weight: 700; font-size: 10px; text-align: left; padding: 3px 8px; }
 tr.grp-filter-row:hover td.grp-filter-name { background: #324558 !important; }
 td.grp-filter-bar { background: #f8fafc; color: #2d3748; font-size: 10px; font-weight: 600; text-align: left; padding: 3px 8px; }
 
@@ -243,7 +241,7 @@ td.grp-filter-bar { background: #f8fafc; color: #2d3748; font-size: 10px; font-w
   background: #fff; color: #2d3748; cursor: pointer;
   font-size: 12px; font-family: inherit; user-select: none; white-space: nowrap;
 }
-.ms-trigger:hover { border-color: #1e2d3d; }
+.ms-trigger:hover { border-color: #E06820; }
 .ms-arrow { font-size: 9px; color: #8a9ab0; transition: transform .15s; }
 .multi-select.open .ms-arrow { transform: rotate(180deg); }
 .ms-dropdown {
@@ -257,7 +255,7 @@ td.grp-filter-bar { background: #f8fafc; color: #2d3748; font-size: 10px; font-w
   padding: 7px 12px; cursor: pointer; font-size: 12px; color: #2d3748; transition: background .1s;
 }
 .ms-item:hover { background: #f4f6f8; }
-.ms-item input[type=checkbox] { cursor: pointer; accent-color: #1e2d3d; width: 13px; height: 13px; flex-shrink: 0; }
+.ms-item input[type=checkbox] { cursor: pointer; accent-color: #E06820; width: 13px; height: 13px; flex-shrink: 0; }
 .ms-item.all-item { border-bottom: 1px solid #e4e8ed; font-weight: 600; margin-bottom: 2px; }
 
 /* ── DARK MODE ── */
@@ -272,7 +270,7 @@ body.dark .filter-divider { background: #141a26; }
 body.dark .filter-label { color: #2a3a54; }
 body.dark .btn-group { border-color: #1e283a; }
 body.dark .btn-group button { background: #0e111a; color: #6a8aaa; border-right-color: #1e283a; }
-body.dark .btn-group button.active { background: #1a4090; color: #c8e0ff; font-weight: 700; }
+body.dark .btn-group button.active { background: #8A3010; color: #FFD4A8; font-weight: 700; }
 body.dark .btn-group button:hover:not(.active) { background: #141a26; color: #c8d8e8; }
 body.dark select { background: #0e111a; color: #6a8aaa; border-color: #1e283a; }
 body.dark .compare-toggle { background: #0e111a; color: #6a8aaa; border-color: #1e283a; }
@@ -300,10 +298,10 @@ body.dark tr.no-data-row td.day-cell, body.dark tr.no-data-row td.date-cell { op
 body.dark .legend { color: #1e2e46; }
 body.dark #modal { background: rgba(0,0,0,.85); }
 body.dark #modalBox { background: #0a0d14; color: #8aaac8; border: 1px solid #141a26; }
-body.dark .modal-header { color: #3a70c0; border-bottom-color: #0e2040; }
-body.dark .modal-header button { color: #1e3050; }
-body.dark .modal-header button:hover { color: #6a9ac8; }
-body.dark .modal-group-header { color: #3a70c0; border-bottom-color: #0e2040; }
+body.dark .modal-header { color: #F47629; border-bottom-color: #3A1A08; }
+body.dark .modal-header button { color: #5A2A10; }
+body.dark .modal-header button:hover { color: #F47629; }
+body.dark .modal-group-header { color: #F47629; border-bottom-color: #3A1A08; }
 body.dark .modal-analyst { color: #3a5a7a; border-bottom-color: #0a0d14; }
 body.dark .modal-empty { color: #141a26; }
 body.dark tr.grp-breakdown-hdr td { background: #080a10; color: #141a26; border-top-color: #141a26; }
@@ -311,7 +309,7 @@ body.dark tr.grp-filter-row:hover td { background: #0e1220 !important; }
 body.dark td.grp-filter-name { background: #06090f !important; color: #3a6090 !important; }
 body.dark tr.grp-filter-row:hover td.grp-filter-name { background: #0a0e1a !important; }
 body.dark td.grp-filter-bar { background: #0a0d14; color: #2a3a54; }
-body.dark td.heat:hover { outline-color: #2a60c0; background: #1a3060 !important; color: #e0e8f0 !important; }
+body.dark td.heat:hover { outline-color: #E06820; background: #6A2808 !important; color: #FFD4A8 !important; }
 body.dark .ms-trigger { background: #0e111a; border-color: #1e283a; color: #6a8aaa; }
 body.dark .ms-trigger:hover { border-color: #3a5a8a; }
 body.dark .ms-dropdown { background: #0e111a; border-color: #1e283a; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
@@ -336,9 +334,8 @@ body.dark td.heat.ratio-good { background: #061410; color: #22c55e; }
 
 <div class="page-header">
   <div class="brand">
-    <div class="brand-logo">N</div>
+    <img src="data:image/png;base64,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" alt="Netrio" class="brand-logo-img">
     <div>
-      <div class="brand-name">Netrio Operations</div>
       <div class="brand-sub">Cases Heatmap — 2026 Year to Date</div>
     </div>
   </div>
@@ -2944,8 +2941,8 @@ function buildDates(month) {
   return result;
 }
 let DATES = buildDates('6');
-const PALETTE_BLUE  = ['#eaf3fb','#aed4f0','#5ba3d9','#2171b5','#084594'];
-const PALETTE_GREEN = ['#eaf7ee','#a8ddb5','#41ab5d','#238b45','#00441b'];
+const PALETTE_BLUE  = ['#EBF4F5','#A8D0D4','#5A9DA8','#25737E','#0D4048'];
+const PALETTE_GREEN = ['#FFF5EC','#FEC89A','#FC8840','#D85E1A','#7A3008'];
 let PALETTE = PALETTE_BLUE;
 
 function getColor(count, max) {

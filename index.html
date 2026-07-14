@@ -3667,6 +3667,11 @@ const SHIFT_TO_HOURS = [
   [/4:30\s*AM\s*[-–]\s*2\s*PM/i,      [5,6,7,8,9,10,11,12,13,14]],
   [/5:30\s*AM\s*[-–]\s*2\s*PM/i,      [6,7,8,9,10,11,12,13,14]],
   [/6:30\s*AM\s*[-–]\s*3\s*PM/i,      [7,8,9,10,11,12,13,14,15]],
+  // Truncated midnight shifts: "12 - 9 AM" means "12 AM - 9 AM" (no AM suffix on 12)
+  [/^12\s*[-–]\s*9\s*AM/i,            [1,2,3,4,5,6,7,8,9]],
+  [/^12\s*[-–]\s*8\s*AM/i,            [1,2,3,4,5,6,7,8]],
+  [/^12\s*[-–]\s*10\s*AM/i,           [1,2,3,4,5,6,7,8,9,10]],
+  [/^12\s*[-–]\s*11\s*AM/i,           [1,2,3,4,5,6,7,8,9,10,11]],
 ];
 
 const PERSON_GROUP = {
@@ -3818,6 +3823,23 @@ async function parseRosterPDF(arrayBuffer) {
       }
     }
     weekDates = colItems.map(c=>c.dateNum).filter(n=>n!=null);
+
+    // Fallback: dates may be in a separate row just above the header (different y-band).
+    // In Teams Shifts PDFs, dates (y=740) and day names (y=731) are ~9px apart — just outside
+    // the 8px row-grouping tolerance — so they land in separate rows. Use x-proximity to match.
+    if (weekDates.length < 3) {
+      const nearNums = rows
+        .filter(r => r !== headerRow && Math.abs(r.y - headerRow.y) <= 25)
+        .flatMap(r => r.items)
+        .filter(i => /^\d{1,2}$/.test(i.str) && +i.str >= 1 && +i.str <= 31);
+      colItems.forEach(col => {
+        if (col.dateNum != null) return;
+        const byX = nearNums.slice().sort((a,b) => Math.abs(a.x-col.x) - Math.abs(b.x-col.x));
+        if (byX.length) col.dateNum = +byX[0].str;
+      });
+      weekDates = colItems.map(c=>c.dateNum).filter(n=>n!=null);
+    }
+
     console.log(`[PDF p${pn}] ${month}/${year} cols=[${colItems.map(c=>c.str)}] dates=[${weekDates}]`);
     if (weekDates.length < 3) { console.log(`[PDF p${pn}] too few dates → skip`); continue; }
 
@@ -3828,15 +3850,18 @@ async function parseRosterPDF(arrayBuffer) {
     }));
     function dayIdxOf(x) { return colBounds.findIndex(b => x>=b.x0 && x<b.x1); }
 
-    function dateKeyFor(dayIdx) {
-      if (dayIdx<0||dayIdx>=weekDates.length) return null;
-      let d=weekDates[dayIdx], m=month, y=year;
-      if (dayIdx>0 && weekDates[dayIdx-1]!=null && d<weekDates[dayIdx-1]) { m++; if(m>12){m=1;y++;} }
+    // Precompute date keys — count ALL previous rollovers so Sat/Sun after a month-boundary
+    // week (e.g. Apr30→May1) get the correct month, not just the base month.
+    const dateKeys = weekDates.map((d, dayIdx) => {
+      let m = month, y = year;
+      for (let i = 1; i <= dayIdx; i++) {
+        if (weekDates[i] < weekDates[i-1]) { m++; if (m>12){m=1;y++;} }
+      }
       const leap = y%4===0&&(y%100!==0||y%400===0);
       const dMax=[0,31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
-      if (d<1||d>dMax[m]) return null;
-      return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    }
+      return (d>=1&&d<=dMax[m]) ? `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` : null;
+    });
+    function dateKeyFor(dayIdx) { return (dayIdx>=0&&dayIdx<dateKeys.length) ? dateKeys[dayIdx] : null; }
 
     // Walk rows below header: identify person name rows then their shift rows
     const belowHeader = rows.filter(r => r.y < headerRow.y - 8);

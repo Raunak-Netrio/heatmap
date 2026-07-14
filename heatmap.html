@@ -1444,15 +1444,17 @@ document.getElementById('upPdf').addEventListener('change', async function(e) {
   const files = [...e.target.files]; if (!files.length) return;
   setUploadState('pdf', 'loading', `Parsing ${files.length} PDF(s)…`);
   try {
-    let pages = 0;
+    let totalSlots = 0;
     for (const file of files) {
       const buf = await file.arrayBuffer();
-      pages += await parseRosterPDF(buf);
+      const result = await parseRosterPDF(buf);
+      totalSlots += (result && result.slots) || 0;
     }
-    setUploadState('pdf', 'success', `✓ ${files.length} PDF(s) loaded`);
+    const msg = totalSlots > 0 ? `✓ ${totalSlots} roster slots loaded` : `✓ Loaded (0 slots — check console F12)`;
+    setUploadState('pdf', totalSlots > 0 ? 'success' : 'error', msg);
     render();
   } catch(err) {
-    setUploadState('pdf', 'error', '✗ ' + err.message.slice(0,50));
+    setUploadState('pdf', 'error', '✗ ' + err.message.slice(0,60));
     console.error(err);
   }
 });
@@ -1579,14 +1581,14 @@ function addShift(person, dateKey, hours, target) {
 async function parseRosterPDF(arrayBuffer) {
   if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js library not loaded');
   const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-  let pagesParsed = 0;
-  const tempAvail = {}; // collect here; merge at end per-date
+  console.log(`[PDF] ${pdf.numPages} page(s)`);
+  let pagesParsed = 0, totalSlots = 0;
+  const tempAvail = {};
 
   for (let pn = 1; pn <= pdf.numPages; pn++) {
     const page = await pdf.getPage(pn);
     const tc = await page.getTextContent();
 
-    // Collect items with coordinates
     const items = tc.items
       .filter(it => it.str && it.str.trim().length)
       .map(it => ({str: it.str.trim(), x: Math.round(it.transform[4]), y: Math.round(it.transform[5])}))
@@ -1594,57 +1596,60 @@ async function parseRosterPDF(arrayBuffer) {
 
     if (!items.length) continue;
 
-    // Group into rows (±6px y-tolerance)
+    // Log first page items for debugging
+    if (pn === 1) console.log(`[PDF p1] items:`, items.slice(0,40).map(i=>`"${i.str}"@(${i.x},${i.y})`).join(' '));
+
+    // Group items into rows (±8px y-tolerance)
     const rows = [];
     for (const item of items) {
-      const row = rows.find(r => Math.abs(r.y - item.y) <= 6);
+      const row = rows.find(r => Math.abs(r.y - item.y) <= 8);
       if (row) row.items.push(item);
       else rows.push({y: item.y, items:[item]});
     }
     rows.forEach(r => r.items.sort((a,b) => a.x - b.x));
 
-    // Find header row with day names
-    const DAY_RE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/i;
+    // Find row containing >= 3 day-name words (handles "21 Mon" combined items)
     let headerRow = null, weekDates = [], year = 2026, month = 6;
-
     for (const row of rows) {
-      const texts = row.items.map(i => i.str);
-      if (texts.filter(t => DAY_RE.test(t)).length >= 3) { headerRow = row; break; }
+      const combined = row.items.map(i=>i.str).join(' ');
+      if ((combined.match(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/gi)||[]).length >= 3) { headerRow = row; break; }
     }
-    // Find year/month from any row
+
+    // Find year/month from any row on this page
     for (const row of rows) {
       const full = row.items.map(i=>i.str).join(' ');
-      const mMatch = full.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})/i);
-      if (mMatch) {
-        year = parseInt(mMatch[2]);
-        const mn = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-        month = mn[mMatch[1].toLowerCase().slice(0,3)];
+      const mm = full.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})/i);
+      if (mm) {
+        year = parseInt(mm[2]);
+        month = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12}[mm[1].toLowerCase().slice(0,3)];
         break;
       }
     }
-    if (!headerRow) continue;
 
-    // Extract week day numbers (integers 1-31 near header)
-    const colItems = headerRow.items.filter(i => DAY_RE.test(i.str));
-    // Look for numbers in rows within 30px above header
-    const nearHeader = rows.filter(r => r.y > headerRow.y - 30 && r.y <= headerRow.y + 5);
-    const numItems = nearHeader.flatMap(r => r.items).filter(i => /^\d{1,2}$/.test(i.str) && parseInt(i.str)>=1 && parseInt(i.str)<=31);
+    if (!headerRow) { console.log(`[PDF p${pn}] no day-header → skip`); continue; }
 
-    // Map each day column to its date number.
-    // The header format is "DD HH DayName DD HH DayName..." where DD=date, HH=headcount/hours.
-    // DD is leftmost (smallest x) before the day name — so pick leftmost candidate, not closest.
-    const dayDates = colItems.map((col, idx) => {
-      const leftBound = idx === 0 ? 0 : Math.floor((colItems[idx-1].x + col.x) / 2);
-      const candidates = numItems.filter(n => n.x >= leftBound && n.x < col.x).sort((a,b) => a.x - b.x);
-      if (candidates.length) return parseInt(candidates[0].str);
-      // Fallback: closest number
-      const sorted = [...numItems].sort((a,b) => Math.abs(a.x-col.x) - Math.abs(b.x-col.x));
-      return sorted[0] ? parseInt(sorted[0].str) : null;
-    }).filter(Boolean);
+    // Parse header items left-to-right to extract day columns and their calendar dates.
+    // Format: "DD [HH] DayName DD [HH] DayName ..."  (DD=date 1-31, HH=headcount)
+    // Items may be split ("27","21","Mon") or combined ("21 Mon" or "27 21 Mon").
+    const DAY_WORD = /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/i;
+    const colItems = []; // {x, str (day abbrev), dateNum}
+    let pendingNums = [];
+    for (const item of headerRow.items) {
+      const dm = item.str.match(DAY_WORD);
+      if (dm) {
+        const inline = [...item.str.matchAll(/\b(\d{1,2})\b/g)].map(m=>+m[1]).filter(n=>n>=1&&n<=31);
+        const all = [...pendingNums, ...inline];
+        colItems.push({x: item.x, str: dm[1], dateNum: all.length ? all[0] : null});
+        pendingNums = [];
+      } else {
+        pendingNums.push(...[...item.str.matchAll(/\b(\d{1,2})\b/g)].map(m=>+m[1]).filter(n=>n>=1&&n<=31));
+      }
+    }
+    weekDates = colItems.map(c=>c.dateNum).filter(n=>n!=null);
+    console.log(`[PDF p${pn}] ${month}/${year} cols=[${colItems.map(c=>c.str)}] dates=[${weekDates}]`);
+    if (weekDates.length < 3) { console.log(`[PDF p${pn}] too few dates → skip`); continue; }
 
-    if (dayDates.length >= 3) weekDates = dayDates;
-
-    // Column x bounds
+    // Column x-bounds for mapping shift items to dates
     const colBounds = colItems.map((ci, idx) => ({
       x0: idx===0 ? 0 : Math.floor((colItems[idx-1].x + ci.x)/2),
       x1: idx===colItems.length-1 ? 9999 : Math.floor((ci.x + colItems[idx+1].x)/2),
@@ -1654,85 +1659,77 @@ async function parseRosterPDF(arrayBuffer) {
     function dateKeyFor(dayIdx) {
       if (dayIdx<0||dayIdx>=weekDates.length) return null;
       let d=weekDates[dayIdx], m=month, y=year;
-      // handle month rollover (e.g. Jun29,Jun30,Jul1...)
-      if (dayIdx>0 && weekDates[dayIdx-1] && d<weekDates[dayIdx-1]) { m++; if(m>12){m=1;y++;} }
-      const dMax=[0,31,28,31,30,31,30,31,31,30,31,30,31];
+      if (dayIdx>0 && weekDates[dayIdx-1]!=null && d<weekDates[dayIdx-1]) { m++; if(m>12){m=1;y++;} }
+      const leap = y%4===0&&(y%100!==0||y%400===0);
+      const dMax=[0,31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
       if (d<1||d>dMax[m]) return null;
       return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     }
 
-    // Walk rows below header, identify person rows then their shifts
+    // Walk rows below header: identify person name rows then their shift rows
     const belowHeader = rows.filter(r => r.y < headerRow.y - 8);
     const KNOWN_NAMES = Object.keys(PERSON_GROUP);
     let curPerson = null;
+    let pageShifts = 0;
 
     for (const row of belowHeader) {
       const rowText = row.items.map(i=>i.str).join(' ');
 
-      // Dynamic DELETED detection: "(DELETED)" on hours row → skip this person
+      // "(DELETED)" on the hours row → mark person as deleted
       if (/\(DELETED\)/i.test(rowText)) { curPerson = null; continue; }
 
-      // Try exact match first, then fuzzy first+last name fallback
+      // Exact name match, then fuzzy first+last word fallback
       let matched = null;
       for (const name of KNOWN_NAMES) {
         const parts = name.split(' ');
         const startItems = row.items.slice(0, parts.length).map(i=>i.str).join(' ');
-        if (startItems === name || rowText.startsWith(name + ' ') || rowText === name) { matched = name; break; }
+        if (startItems === name || rowText === name || rowText.startsWith(name + ' ')) { matched = name; break; }
       }
       if (!matched) {
-        // Fuzzy: match first word + last word of any known name
-        const rowWords = row.items.map(i => i.str);
+        const rowWords = row.items.map(i=>i.str);
         for (const name of KNOWN_NAMES) {
           const parts = name.split(' ');
           if (parts.length < 2) continue;
-          const first = parts[0], last = parts[parts.length - 1];
-          if (rowWords[0] === first && rowWords.some(w => w === last)) { matched = name; break; }
+          if (rowWords[0] === parts[0] && rowWords.some(w => w === parts[parts.length-1])) { matched = name; break; }
         }
       }
 
       if (matched) {
         curPerson = DELETED_STAFF.has(matched) ? null : matched;
+        if (curPerson) console.log(`[PDF p${pn}] person: ${curPerson}`);
       }
       if (!curPerson) continue;
 
-      // Collect shift items from this row (skip items that look like a name)
       const skipCount = matched ? curPerson.split(' ').length : 0;
-      const shiftItems = row.items.slice(skipCount);
-      for (const item of shiftItems) {
+      for (const item of row.items.slice(skipCount)) {
         const hrs = shiftToHours(item.str);
         if (!hrs) continue;
         const di = dayIdxOf(item.x);
         const dk = dateKeyFor(di);
-        if (dk) addShift(curPerson, dk, hrs, tempAvail);
+        if (dk) { addShift(curPerson, dk, hrs, tempAvail); pageShifts++; }
+        else console.log(`[PDF p${pn}] shift "${item.str}" x=${item.x} → col=${di} → no date`);
       }
     }
-    pagesParsed++;
+    console.log(`[PDF p${pn}] ${pageShifts} shift-slots`);
+    if (pageShifts > 0) pagesParsed++;
+    totalSlots += pageShifts;
   }
 
-  // Only replace dates found in this PDF; leave all other AVAIL dates untouched
-  const affectedDates = new Set(
-    Object.values(tempAvail).flatMap(dates => Object.keys(dates))
-  );
+  // Merge tempAvail into AVAIL (only replace affected dates)
+  const affectedDates = new Set(Object.values(tempAvail).flatMap(d => Object.keys(d)));
   for (const grp of Object.keys(AVAIL)) {
-    for (const dk of affectedDates) {
-      if (AVAIL[grp][dk]) delete AVAIL[grp][dk];
-    }
+    for (const dk of affectedDates) { if (AVAIL[grp][dk]) delete AVAIL[grp][dk]; }
   }
   for (const [grp, dates] of Object.entries(tempAvail)) {
     if (!AVAIL[grp]) AVAIL[grp] = {};
-    for (const [dk, hours] of Object.entries(dates)) {
-      AVAIL[grp][dk] = hours;
-    }
+    for (const [dk, hours] of Object.entries(dates)) AVAIL[grp][dk] = hours;
   }
 
-  // Persist PDF avail delta so it survives refresh
+  // Persist to localStorage
   try {
     const stored = JSON.parse(localStorage.getItem('hm_avail') || '{}');
-    // Clear stored entries for affected dates, then merge new data
     for (const grp of Object.keys(stored)) {
-      for (const dk of affectedDates) {
-        if (stored[grp][dk]) delete stored[grp][dk];
-      }
+      for (const dk of affectedDates) { if (stored[grp][dk]) delete stored[grp][dk]; }
     }
     for (const [grp, dates] of Object.entries(tempAvail)) {
       if (!stored[grp]) stored[grp] = {};
@@ -1741,7 +1738,8 @@ async function parseRosterPDF(arrayBuffer) {
     localStorage.setItem('hm_avail', JSON.stringify(stored));
   } catch(e) { console.warn('localStorage avail save failed:', e); }
 
-  return pagesParsed;
+  console.log(`[PDF] done: ${pagesParsed} pages parsed, ${totalSlots} staff-hour slots across ${affectedDates.size} dates`);
+  return {pages: pagesParsed, slots: totalSlots};
 }
 
 function restoreUploads() {

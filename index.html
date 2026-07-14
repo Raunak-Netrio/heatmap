@@ -38,6 +38,7 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
   background: #fff; border-bottom: 1px solid #dce1e9;
   padding: 8px 20px;
   box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  position: sticky; top: 52px; z-index: 90;
 }
 .filter-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
@@ -143,7 +144,7 @@ td.heat {
   width: 32px; min-width: 32px; height: 26px;
   font-size: 10px; font-weight: 600; cursor: default; transition: opacity .12s;
 }
-td.heat:hover { outline: 2px solid #1e2d3d; z-index: 1; position: relative; }
+td.heat:hover { outline: 2px solid #1e2d3d; z-index: 1; position: relative; background: #1e2d3d !important; color: #fff !important; }
 td.heat.empty { background: #f4f6f9; }
 tr.weekend td.day-cell, tr.weekend td.date-cell { background: #3d1d52; color: #d0bce8; }
 tr.summary-row td { background: #f4f6f8; font-weight: 700; font-size: 10px; color: #2d3748; }
@@ -246,9 +247,9 @@ td.grp-filter-bar { background: #f8fafc; color: #2d3748; font-size: 10px; font-w
 .ms-arrow { font-size: 9px; color: #8a9ab0; transition: transform .15s; }
 .multi-select.open .ms-arrow { transform: rotate(180deg); }
 .ms-dropdown {
-  display: none; position: absolute; top: calc(100% + 4px); left: 0;
+  display: none; position: fixed;
   min-width: 210px; background: #fff; border: 1px solid #d0d5dd; border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 500; padding: 4px 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 9000; padding: 4px 0;
 }
 .multi-select.open .ms-dropdown { display: block; }
 .ms-item {
@@ -310,7 +311,7 @@ body.dark tr.grp-filter-row:hover td { background: #0e1220 !important; }
 body.dark td.grp-filter-name { background: #06090f !important; color: #3a6090 !important; }
 body.dark tr.grp-filter-row:hover td.grp-filter-name { background: #0a0e1a !important; }
 body.dark td.grp-filter-bar { background: #0a0d14; color: #2a3a54; }
-body.dark td.heat:hover { outline-color: #2a60c0; }
+body.dark td.heat:hover { outline-color: #2a60c0; background: #1a3060 !important; color: #e0e8f0 !important; }
 body.dark .ms-trigger { background: #0e111a; border-color: #1e283a; color: #6a8aaa; }
 body.dark .ms-trigger:hover { border-color: #3a5a8a; }
 body.dark .ms-dropdown { background: #0e111a; border-color: #1e283a; box-shadow: 0 4px 16px rgba(0,0,0,.6); }
@@ -3013,7 +3014,15 @@ function setGroup(g) {
 }
 
 function toggleMS() {
-  document.getElementById('groupMulti').classList.toggle('open');
+  const ms = document.getElementById('groupMulti');
+  const isOpen = ms.classList.toggle('open');
+  if (isOpen) {
+    const rect = ms.querySelector('.ms-trigger').getBoundingClientRect();
+    const dd = document.getElementById('msDropdown');
+    dd.style.top  = (rect.bottom + 4) + 'px';
+    dd.style.left = rect.left + 'px';
+    dd.style.minWidth = Math.max(rect.width, 210) + 'px';
+  }
 }
 
 document.addEventListener('click', e => {
@@ -3624,6 +3633,12 @@ document.getElementById('upPdf').addEventListener('change', async function(e) {
     }
     const msg = totalSlots > 0 ? `✓ ${totalSlots} roster slots loaded` : `✓ Loaded (0 slots — check console F12)`;
     setUploadState('pdf', totalSlots > 0 ? 'success' : 'error', msg);
+    // Log per-group totals so assignment issues are easy to spot (open F12 > Console)
+    for (const grp of ['All', ...GROUPS]) {
+      const grpData = AVAIL[grp] || {};
+      const total = Object.values(grpData).reduce((s, hrs) => s + Object.values(hrs).reduce((a, b) => a + b, 0), 0);
+      console.log(`[AVAIL] ${grp}: ${total} staff-hour slots`);
+    }
     render();
   } catch(err) {
     setUploadState('pdf', 'error', '✗ ' + err.message.slice(0,60));
@@ -3893,7 +3908,12 @@ async function parseRosterPDF(arrayBuffer) {
 
       if (matched) {
         curPerson = DELETED_STAFF.has(matched) ? null : matched;
-        if (curPerson) console.log(`[PDF p${pn}] person: ${curPerson}`);
+        if (curPerson) console.log(`[PDF p${pn}] person: ${curPerson} → ${PERSON_GROUP[curPerson]}`);
+      } else if (row.items.length >= 2 && /^[A-Z]/.test(row.items[0].str) && row.items.some(i => /^[A-Z][a-z]/.test(i.str))) {
+        const candidate = row.items.slice(0, 3).map(i => i.str).join(' ');
+        if (!/^\d|^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Week|Help|End|Endpoint|Technical|Netrio)/i.test(candidate)) {
+          console.log(`[PDF p${pn}] UNRECOGNIZED NAME candidate: "${candidate}" — add to PERSON_GROUP if real`);
+        }
       }
       if (!curPerson) continue;
 
@@ -3983,4 +4003,3 @@ render();
 </script>
 </body>
 </html>
-

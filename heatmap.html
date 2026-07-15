@@ -344,6 +344,28 @@ body.dark .ins-kpi-lbl { color: #8A9898; }
 body.dark .ins-chart-title, body.dark .ins-bullets-title { color: #E0E8E8; }
 body.dark .ins-bullet { color: #C8D0D0; border-bottom-color: #2C3032; }
 body.dark .ins-legend { color: #8A9898; }
+#ins-tooltip { position:fixed; z-index:9999; pointer-events:none; display:none; background:rgba(30,34,36,.97); color:#E0E8E8; border:1px solid #3A4042; border-radius:8px; padding:9px 13px; font-size:12px; box-shadow:0 6px 20px rgba(0,0,0,.4); line-height:1.65; max-width:270px; }
+#ins-tooltip strong { color:#F47629; }
+.ins-detail-panel { background:#fff; border:1px solid #dce1e9; border-radius:10px; padding:16px 18px; margin-top:14px; }
+.ins-detail-title { font-size:13px; font-weight:700; color:#2B3032; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #E06820; }
+.ins-detail-subtitle { font-size:9.5px; font-weight:700; color:#6b7a8d; text-transform:uppercase; letter-spacing:.5px; margin:12px 0 7px; }
+.ins-detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px; margin-bottom:4px; }
+.ins-detail-kpi { background:#f4f7fb; border-radius:8px; padding:9px 11px; }
+.ins-detail-kpi-val { font-size:16px; font-weight:700; color:#E06820; }
+.ins-detail-kpi-lbl { font-size:9px; color:#6b7a8d; margin-top:2px; text-transform:uppercase; letter-spacing:.3px; }
+.ins-detail-rows { display:flex; flex-direction:column; gap:3px; }
+.ins-detail-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 10px; background:#f4f7fb; border-radius:5px; font-size:11.5px; color:#2B3032; }
+.ins-detail-row:nth-child(even) { background:#eef1f6; }
+.ins-detail-close { float:right; cursor:pointer; font-size:14px; color:#9aabb8; line-height:1; }
+.ins-detail-close:hover { color:#E06820; }
+body.dark .ins-detail-panel { background:#1E2224; border-color:#2C3032; }
+body.dark .ins-detail-title { color:#E0E8E8; }
+body.dark .ins-detail-subtitle { color:#8A9898; }
+body.dark .ins-detail-kpi { background:#272B2C; }
+body.dark .ins-detail-kpi-val { color:#F47629; }
+body.dark .ins-detail-kpi-lbl { color:#8A9898; }
+body.dark .ins-detail-row { background:#272B2C; color:#C8D0D0; }
+body.dark .ins-detail-row:nth-child(even) { background:#222628; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -488,6 +510,7 @@ body.dark .ins-legend { color: #8A9898; }
 
 <div id="insightsView" style="display:none"></div>
 <div id="tooltip"></div>
+<div id="ins-tooltip"></div>
 
 <script src="data_full.js"></script>
 <script src="resolved_by_full.js"></script>
@@ -964,6 +987,43 @@ function setTimezone(val) {
   render();
 }
 
+// ── Insights interactivity state ─────────────────────────────────────────
+const INS_STATE = { tips: {}, metas: {}, showDetail: null };
+let _insEventsReady = false;
+
+function _setupInsightEvents() {
+  if (_insEventsReady) return;
+  _insEventsReady = true;
+  const view = document.getElementById('insightsView');
+  const tipEl = document.getElementById('ins-tooltip');
+  view.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-ins]');
+    if (!el || !INS_STATE.tips[el.dataset.ins]) { tipEl.style.display = 'none'; return; }
+    tipEl.innerHTML = INS_STATE.tips[el.dataset.ins];
+    tipEl.style.display = 'block';
+  });
+  view.addEventListener('mousemove', e => {
+    if (tipEl.style.display === 'none') return;
+    const tw = tipEl.offsetWidth + 28, th = tipEl.offsetHeight + 12;
+    let lx = e.clientX + 16, ly = e.clientY - 12;
+    if (lx + tw > window.innerWidth)  lx = e.clientX - tw + 12;
+    if (ly + th > window.innerHeight) ly = e.clientY - th - 4;
+    if (ly < 4) ly = 4;
+    tipEl.style.left = lx + 'px'; tipEl.style.top = ly + 'px';
+  });
+  view.addEventListener('mouseout', e => {
+    if (!e.relatedTarget || !e.relatedTarget.closest('[data-ins]')) tipEl.style.display = 'none';
+  });
+  view.addEventListener('click', e => {
+    const el = e.target.closest('[data-ins]');
+    if (!el || !INS_STATE.metas[el.dataset.ins]) return;
+    tipEl.style.display = 'none';
+    if (INS_STATE.showDetail) INS_STATE.showDetail(INS_STATE.metas[el.dataset.ins]);
+    const det = document.getElementById('ins-detail');
+    if (det && det.innerHTML) setTimeout(() => det.scrollIntoView({behavior:'smooth', block:'nearest'}), 60);
+  });
+}
+
 // ── Insights ──────────────────────────────────────────────────────────────
 function renderInsights() {
   const view = document.getElementById('insightsView');
@@ -986,13 +1046,13 @@ function renderInsights() {
 
   DATES.forEach(({ key, day }) => {
     const dO = gOpened[key] || {}, dR = gResolved[key] || {}, dA = gAvail[key] || {};
-    let dayOpen = 0, dayAvail = 0;
+    let dayOpen = 0, dayAvail = 0, dayRes = 0;
     for (let h = 1; h <= 24; h++) {
       const o = dO[String(h)] || 0, r = dR[String(h)] || 0, a = dA[h] || 0;
       byHour[h] += o; byHourRes[h] += r; byHourAv[h] += a;
-      dayOpen += o; totalOpen += o; totalRes += r; dayAvail += a;
+      dayOpen += o; totalOpen += o; totalRes += r; dayAvail += a; dayRes += r;
     }
-    if (dayOpen > 0 || dayAvail > 0) { activeDays++; byDay.push({ v: dayOpen, label: key.slice(8) + '/' + key.slice(5,7) }); }
+    if (dayOpen > 0 || dayAvail > 0) { activeDays++; byDay.push({ v: dayOpen, key, label: key.slice(8)+'/'+key.slice(5,7), tip: '<strong>'+key+'</strong><br>Opened: '+dayOpen.toLocaleString()+' | Resolved: '+dayRes.toLocaleString()+'<br>Rate: '+(dayOpen>0?(dayRes/dayOpen*100).toFixed(0):0)+'% | Staff slots: '+dayAvail, meta: {type:'day',key,cases:dayOpen,res:dayRes,avail:dayAvail} }); }
     const dow = DAY_NAMES.indexOf(day);
     if (dow >= 0) { byDow[dow] += dayOpen; byDowDays[dow]++; }
     byMonth[key.slice(5,7)] = (byMonth[key.slice(5,7)] || 0) + dayOpen;
@@ -1061,6 +1121,17 @@ function renderInsights() {
     }
   }
 
+  // ── Interactive tip registry ──────────────────────────────────────────────
+  INS_STATE.tips = {}; INS_STATE.metas = {};
+  let _tipIdx = 0;
+  function mkTip(tip, meta) {
+    if (!tip) return '';
+    const k = 'i' + (++_tipIdx);
+    INS_STATE.tips[k] = tip;
+    if (meta) INS_STATE.metas[k] = meta;
+    return ' data-ins="' + k + '" style="cursor:pointer"';
+  }
+
   // ── SVG helpers ──────────────────────────────────────────────────────────
   function svgBar(items, opts) {
     opts = opts || {};
@@ -1079,7 +1150,7 @@ function renderInsights() {
     items.forEach((d, i) => {
       const bh = Math.max((d.v / maxV) * ph, 0);
       const x  = PL + i * bw + (hasSec ? bw * .04 : (bw - barW) / 2);
-      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c || '#E06820'}" rx="1.5"/>`;
+      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c || '#E06820'}" rx="1.5"${mkTip(d.tip, d.meta)}/>`;
       if (opts.showVals && bh > 8) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="4" fill="${d.c || '#E06820'}">${d.v > 0 ? (Number.isInteger(d.v) ? d.v : d.v.toFixed(1)) : ''}</text>`;
       if (hasSec && sec[i] !== undefined) {
         const sh = Math.max((sec[i] / maxV) * ph, 0);
@@ -1114,7 +1185,7 @@ function renderInsights() {
       const bh = (d.v / maxV) * ph;
       const barW = bw * .7, x = PL + i * bw + (bw - barW) / 2;
       const fill = d.v >= 1 ? '#e74c3c' : d.v >= 0.7 ? '#FBA832' : '#2ecc71';
-      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity=".9"/>`;
+      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity=".9"${mkTip(d.tip, d.meta)}/>`;
       if (bh > 10) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="3.8" fill="${fill}">${d.v.toFixed(2)}</text>`;
       if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${orItems.length > 18 ? 3.2 : 5}" fill="${labelC}">${d.l}</text>`;
     });
@@ -1147,7 +1218,8 @@ function renderInsights() {
     }
     const lInt = Math.max(1, Math.ceil(pts.length / 8));
     pts.forEach((d, i) => {
-      s += `<circle cx="${cx(i).toFixed(1)}" cy="${cy(d.v).toFixed(1)}" r="1.6" fill="${opts.lineC || '#E06820'}"/>`;
+      s += `<circle cx="${cx(i).toFixed(1)}" cy="${cy(d.v).toFixed(1)}" r="1.8" fill="${opts.lineC || '#E06820'}" pointer-events="none"/>`;
+      s += `<circle cx="${cx(i).toFixed(1)}" cy="${cy(d.v).toFixed(1)}" r="4" fill="transparent"${mkTip(d.tip, d.meta)}/>`;
       if (i % lInt === 0 && d.label) s += `<text x="${cx(i).toFixed(1)}" y="${H-PB+7}" text-anchor="middle" font-size="3.8" fill="${labelC}">${d.label}</text>`;
     });
     s += '</svg>';
@@ -1159,23 +1231,37 @@ function renderInsights() {
   for (let d = 0; d < 7; d++) prDowAvg[d] = prByDowDays[d] > 0 ? prByDow[d] / prByDowDays[d] : 0;
 
   const orItems = Array.from({length:24}, (_, i) => {
-    const h = i + 1;
-    return { v: byHourAv[h] > 0 ? Math.round(orByHour[h] * 100) / 100 : 0,
-             l: (h === 1 || h % 3 === 0) ? tzHourLabel(h) : '' };
+    const h = i + 1, orV = byHourAv[h] > 0 ? Math.round(orByHour[h]*100)/100 : 0;
+    const st = orV>=1?'🔴 Over Capacity':orV>=0.7?'🟡 Busy':orV>0?'🟢 Comfortable':null;
+    return { v: orV, l: (h===1||h%3===0) ? tzHourLabel(h) : '',
+      tip: st ? '<strong>'+tzHourLabel(h)+'</strong><br>OR: '+orV.toFixed(2)+' '+st+'<br>Cases: '+byHour[h].toLocaleString()+' | Staff: '+byHourAv[h] : null,
+      meta: st ? {type:'hour',h,cases:byHour[h],res:byHourRes[h],staff:byHourAv[h],or:orV} : null };
   });
-  const hourItems = Array.from({length:24}, (_, i) => ({
-    v: byHour[i+1], c: (i+1) === peakH ? '#F47629' : '#E06820',
-    l: (i+1) === 1 || (i+1) % 4 === 0 ? tzHourLabel(i+1) : ''
-  }));
+  const hourItems = Array.from({length:24}, (_, i) => {
+    const h = i+1, orV = byHourAv[h]>0 ? orByHour[h] : 0;
+    const pct = totalOpen>0 ? (byHour[h]/totalOpen*100).toFixed(1) : '0';
+    return { v: byHour[h], c: h===peakH?'#F47629':'#E06820',
+      l: h===1||h%4===0 ? tzHourLabel(h) : '',
+      tip: '<strong>'+tzHourLabel(h)+'</strong><br>Cases: '+byHour[h].toLocaleString()+' ('+pct+'% of total)<br>Resolved: '+byHourRes[h].toLocaleString()+' | Staff: '+byHourAv[h]+(orV>0?'<br>OR: '+orV.toFixed(2):''),
+      meta: {type:'hour',h,cases:byHour[h],res:byHourRes[h],staff:byHourAv[h],or:orV} };
+  });
   const staffSec      = Array.from({length:24}, (_, i) => byHourAv[i+1]);
   const hourPriorSec  = compareMode ? Array.from({length:24}, (_, i) => prByHour[i+1]) : [];
-  const dowItems = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((lbl, i) => ({
-    v: Math.round(dowAvg[i] * 10) / 10, l: lbl,
-    c: i >= 5 ? '#FBA832' : i === parseInt(peakDowEntry[0]) ? '#F47629' : '#E06820'
-  }));
+  const dowItems = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((lbl, i) => {
+    const avg = Math.round(dowAvg[i]*10)/10, days = byDowDays[i], total = byDow[i];
+    return { v: avg, l: lbl,
+      c: i>=5?'#FBA832':i===parseInt(peakDowEntry[0])?'#F47629':'#E06820',
+      tip: days>0?'<strong>'+DAY_NAMES[i]+'</strong><br>Avg: '+avg.toFixed(1)+' cases/day<br>Total: '+total.toLocaleString()+' across '+days+' days':null,
+      meta: days>0?{type:'dow',dow:i,name:DAY_NAMES[i],avg,total,days}:null };
+  });
   const dowPriorSec = compareMode ? Array.from({length:7}, (_, i) => Math.round(prDowAvg[i]*10)/10) : [];
   const MN2 = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun'};
-  const monthItems = Object.keys(byMonth).sort().map(mk => ({ v: byMonth[mk], l: MN2[mk], c: '#E06820' }));
+  const monthItems = Object.keys(byMonth).sort().map(mk => {
+    const v = byMonth[mk];
+    return { v, l: MN2[mk], c: '#E06820',
+      tip: '<strong>'+(MN2[mk]||mk)+'</strong><br>Total: '+v.toLocaleString()+' cases',
+      meta: {type:'month',mk,label:MN2[mk]||mk,total:v} };
+  });
   const priorTrendPts = compareMode ? byDay.map(d => ({ v: 0, label: '' })) : [];
   if (compareMode) {
     DATES.forEach(({ key }, idx) => {
@@ -1196,6 +1282,84 @@ function renderInsights() {
 
   const SCOPE = {'1':'January','2':'February','3':'March','4':'April','5':'May','6':'June','all':'Full Year'}[currentMonth] || '';
   const cmpBadge = compareMode ? ' <span style="font-size:10px;color:#E06820;font-weight:600">⚡ vs Prior</span>' : '';
+
+  INS_STATE.showDetail = function(meta) {
+    const det = document.getElementById('ins-detail');
+    if (!det) return;
+    const kpi = (val, lbl) => `<div class="ins-detail-kpi"><div class="ins-detail-kpi-val">${val}</div><div class="ins-detail-kpi-lbl">${lbl}</div></div>`;
+    const row = (...cells) => `<div class="ins-detail-row">${cells.map(c=>`<span>${c}</span>`).join('')}</div>`;
+    const closeBtn = `<span class="ins-detail-close" onclick="document.getElementById('ins-detail').innerHTML=''">✕</span>`;
+    let html = '';
+
+    if (meta.type === 'hour') {
+      const {h, cases, res, staff, or: orV} = meta;
+      const orColor = orV>=1?'#e74c3c':orV>=0.7?'#FBA832':'#22c55e';
+      const rRate = cases>0?(res/cases*100).toFixed(0)+'%':'—';
+      const pct = totalOpen>0&&cases>0?(cases/totalOpen*100).toFixed(1)+'%':'—';
+      const dowBreak = {};
+      for (let d=0;d<7;d++) dowBreak[d]={total:0,count:0};
+      DATES.forEach(({key,day}) => {
+        const v=(gOpened[key]||{})[String(h)]||0, d=DAY_NAMES.indexOf(day);
+        if (d>=0){dowBreak[d].total+=v;dowBreak[d].count++;}
+      });
+      const dowRows = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((lbl,i)=>{
+        const b=dowBreak[i],avg=b.count>0?(b.total/b.count).toFixed(1):'0';
+        return row(lbl, b.total.toLocaleString()+' cases', 'avg '+avg+'/day');
+      }).join('');
+      html = `<div class="ins-detail-panel">
+        <div class="ins-detail-title">📊 ${tzHourLabel(h)} — Hour Breakdown ${closeBtn}</div>
+        <div class="ins-detail-grid">${kpi(cases.toLocaleString(),'Cases Opened')}${kpi(res.toLocaleString(),'Resolved')}${kpi(rRate,'Resolution Rate')}${kpi(staff,'Avg Staff/Day')}${kpi('<span style="color:'+orColor+'">'+orV.toFixed(2)+'</span>','Occupancy Ratio')}${kpi(pct,'% of Period Volume')}</div>
+        <div class="ins-detail-subtitle">CASES BY DAY OF WEEK AT ${tzHourLabel(h)}</div>
+        <div class="ins-detail-rows">${dowRows}</div></div>`;
+    }
+    else if (meta.type === 'dow') {
+      const {dow, name, avg, total, days} = meta;
+      const hTotals = {};
+      for (let h=1;h<=24;h++) hTotals[h]=0;
+      DATES.forEach(({key,day}) => {
+        if (day!==name) return;
+        const dO=gOpened[key]||{};
+        for (let h=1;h<=24;h++) hTotals[h]+=(dO[String(h)]||0);
+      });
+      const top5 = Object.entries(hTotals).filter(([_,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      const hRows = top5.map(([h,v])=>row(tzHourLabel(Number(h)),v.toLocaleString()+' cases','avg '+(days>0?(v/days).toFixed(1):0)+'/day')).join('');
+      html = `<div class="ins-detail-panel">
+        <div class="ins-detail-title">📅 ${name} — Day Breakdown ${closeBtn}</div>
+        <div class="ins-detail-grid">${kpi(avg.toFixed(1),'Avg Cases/Day')}${kpi(total.toLocaleString(),'Total Cases')}${kpi(days,name+'s in Period')}${kpi(top5.length>0?tzHourLabel(Number(top5[0][0])):'—','Peak Hour')}</div>
+        <div class="ins-detail-subtitle">BUSIEST HOURS ON ${name.toUpperCase()}S (TOP 5)</div>
+        <div class="ins-detail-rows">${hRows||row('No data','—')}</div></div>`;
+    }
+    else if (meta.type === 'month') {
+      const {mk, label, total} = meta;
+      const mDays = byDay.filter(d=>d.key&&d.key.slice(5,7)===mk).sort((a,b)=>b.v-a.v);
+      const act = mDays.length, avg = act>0?(total/act).toFixed(1):'—';
+      const top5rows = mDays.slice(0,5).map(d=>row(d.key,d.v.toLocaleString()+' cases')).join('');
+      html = `<div class="ins-detail-panel">
+        <div class="ins-detail-title">📆 ${label} — Month Breakdown ${closeBtn}</div>
+        <div class="ins-detail-grid">${kpi(total.toLocaleString(),'Total Cases')}${kpi(avg,'Avg Cases/Day')}${kpi(act,'Active Days')}${kpi(mDays.length>0?mDays[0].v.toLocaleString():'—','Peak Day Volume')}</div>
+        <div class="ins-detail-subtitle">TOP 5 BUSIEST DAYS IN ${label.toUpperCase()}</div>
+        <div class="ins-detail-rows">${top5rows||row('No data','—')}</div></div>`;
+    }
+    else if (meta.type === 'day') {
+      const {key, cases, res, avail} = meta;
+      const rRate = cases>0?(res/cases*100).toFixed(0)+'%':'—';
+      const dO=gOpened[key]||{}, dR=gResolved[key]||{}, dA=gAvail[key]||{};
+      const hData=[];
+      for (let h=1;h<=24;h++){const v=dO[String(h)]||0;if(v>0)hData.push([h,v,dR[String(h)]||0,dA[h]||0]);}
+      hData.sort((a,b)=>b[1]-a[1]);
+      const hRows = hData.slice(0,6).map(([h,v,r,a])=>{
+        const orStr=a>0?(v/a).toFixed(2):'—';
+        const orC=a>0&&v/a>=1?'color:#e74c3c':a>0&&v/a>=0.7?'color:#FBA832':'';
+        return row(tzHourLabel(h),v+' opened / '+r+' resolved','<span style="'+orC+'">OR: '+orStr+'</span>');
+      }).join('');
+      html = `<div class="ins-detail-panel">
+        <div class="ins-detail-title">🗓 ${key} — Daily Breakdown ${closeBtn}</div>
+        <div class="ins-detail-grid">${kpi(cases.toLocaleString(),'Cases Opened')}${kpi(res.toLocaleString(),'Resolved')}${kpi(rRate,'Resolution Rate')}${kpi(avail,'Staff Slots')}</div>
+        <div class="ins-detail-subtitle">HOURLY BREAKDOWN FOR ${key}</div>
+        <div class="ins-detail-rows">${hRows||row('No data','—')}</div></div>`;
+    }
+    det.innerHTML = html;
+  };
 
   view.innerHTML = `
 <div class="ins-kpi-row">
@@ -1261,7 +1425,9 @@ function renderInsights() {
   ${wkendDays > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">${wkendDiff < -10?'📉':'📊'}</span><span>Weekends avg <strong>${wkendAvg.toFixed(1)} cases/day</strong> vs ${wkdayAvg.toFixed(1)} on weekdays (${Math.abs(wkendDiff).toFixed(0)}% ${wkendDiff<0?'lower':'higher'})</span></div>` : ''}
   ${compareMode && prTotalOpen > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">⚡</span><span>vs prior period: case volume <strong>${totalOpen > prTotalOpen ? '▲' : '▼'} ${Math.abs((totalOpen-prTotalOpen)/prTotalOpen*100).toFixed(0)}%</strong> (${prTotalOpen.toLocaleString()} → ${totalOpen.toLocaleString()}), resolution ${prResRate.toFixed(0)}% → <strong>${resRate.toFixed(0)}%</strong></span></div>` : ''}
   ${trendHTML}
-</div>`;
+</div>
+<div id="ins-detail"></div>`;
+  _setupInsightEvents();
 }
 
 function toggleCompare() {

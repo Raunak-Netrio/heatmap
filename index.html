@@ -326,7 +326,7 @@ body.dark td.heat.ratio-good { background: #122018; color: #22c55e; }
 .ins-kpi { background: #fff; border: 1px solid #dce1e9; border-radius: 10px; padding: 12px 14px; }
 .ins-kpi-val { font-size: 20px; font-weight: 700; color: #E06820; line-height: 1.1; }
 .ins-kpi-lbl { font-size: 10px; color: #6b7a8d; margin-top: 3px; text-transform: uppercase; letter-spacing: .4px; }
-.ins-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.ins-charts { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px; }
 .ins-chart-full { grid-column: 1 / -1; }
 .ins-chart-card { background: #fff; border: 1px solid #dce1e9; border-radius: 10px; padding: 14px 16px; }
 .ins-chart-title { font-size: 10.5px; font-weight: 700; color: #2B3032; margin-bottom: 10px; letter-spacing: .3px; }
@@ -3313,7 +3313,7 @@ function renderInsights() {
     const maxV = Math.max(...items.map(d => d.v).concat(hasSec ? sec : []), 1);
     const bw = pw / items.length;
     const barW = hasSec ? bw * .42 : bw * .65;
-    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH || 220}px">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:${opts.dH || 260}px;display:block">`;
     for (let t = 0; t <= 4; t++) {
       const y = PT + ph - (t / 4) * ph;
       s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
@@ -3323,13 +3323,13 @@ function renderInsights() {
       const bh = Math.max((d.v / maxV) * ph, 0);
       const x  = PL + i * bw + (hasSec ? bw * .04 : (bw - barW) / 2);
       s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c || '#E06820'}" rx="1.5"${mkTip(d.tip, d.meta)}/>`;
-      if (opts.showVals && bh > 8) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="4" fill="${d.c || '#E06820'}">${d.v > 0 ? (Number.isInteger(d.v) ? d.v : d.v.toFixed(1)) : ''}</text>`;
+      if (opts.showVals && bh > 8) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="4" fill="${d.c || '#E06820'}" textLength="${(barW*0.9).toFixed(1)}" lengthAdjust="spacingAndGlyphs">${d.v > 0 ? (Number.isInteger(d.v) ? d.v : d.v.toFixed(1)) : ''}</text>`;
       if (hasSec && sec[i] !== undefined) {
         const sh = Math.max((sec[i] / maxV) * ph, 0);
         const sx = x + barW + bw * .04;
         s += `<rect x="${sx.toFixed(1)}" y="${(PT+ph-sh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(sh,.5).toFixed(1)}" fill="${opts.secColor || '#A0AAAA'}" rx="1.5" opacity=".75"/>`;
       }
-      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${items.length > 18 ? 3.2 : 5}" fill="${labelC}">${d.l}</text>`;
+      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${items.length > 18 ? 3.2 : 5}" fill="${labelC}" textLength="${(bw*0.9).toFixed(1)}" lengthAdjust="spacingAndGlyphs">${d.l}</text>`;
     });
     s += '</svg>';
     return s;
@@ -3341,7 +3341,7 @@ function renderInsights() {
     const pw = W - PL - PR, ph = H - PT - PB;
     const maxV = Math.max(...orItems.map(d => d.v), 1.5);
     const bw = pw / orItems.length;
-    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH || 220}px">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:${opts.dH || 260}px;display:block">`;
     for (let t = 0; t <= 4; t++) {
       const v = maxV * t / 4, y = PT + ph - (v / maxV) * ph;
       s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
@@ -3358,8 +3358,7 @@ function renderInsights() {
       const barW = bw * .7, x = PL + i * bw + (bw - barW) / 2;
       const fill = d.v >= 1 ? '#e74c3c' : d.v >= 0.7 ? '#FBA832' : '#2ecc71';
       s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity=".9"${mkTip(d.tip, d.meta)}/>`;
-      if (bh > 10) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="3.8" fill="${fill}">${d.v.toFixed(2)}</text>`;
-      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${orItems.length > 18 ? 3.2 : 5}" fill="${labelC}">${d.l}</text>`;
+      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${orItems.length > 18 ? 3.2 : 5}" fill="${labelC}" textLength="${(bw*0.9).toFixed(1)}" lengthAdjust="spacingAndGlyphs">${d.l}</text>`;
     });
     s += '</svg>';
     return s;
@@ -3374,7 +3373,7 @@ function renderInsights() {
     const maxV = Math.max(...pts.map(d=>d.v), ...pr2.map(d=>d.v), 1);
     const step = pw / (pts.length - 1);
     const cx = (i) => PL + i * step, cy = (v) => PT + ph - (v / maxV) * ph;
-    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH || 220}px">`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:${opts.dH || 260}px;display:block">`;
     for (let t = 0; t <= 4; t++) {
       const y = PT + ph - (t / 4) * ph;
       s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
@@ -3551,18 +3550,18 @@ function renderInsights() {
       <span style="color:#e74c3c">■</span> &gt;1.0 Over Capacity
       <span style="float:right;font-weight:400;color:#9aabb8">— — red dashed = capacity limit (OR 1.0)</span>
     </div>
-    ${svgOR(orItems, {h:120, dH:230})}
+    ${svgOR(orItems, {h:120, dH:280})}
   </div>
 
   <div class="ins-chart-card">
     <div class="ins-chart-title">CASES OPENED BY HOUR${cmpBadge}</div>
-    ${svgBar(hourItems, {h:120, dH:220, secondary: hourPriorSec, secColor:'#A0AAAA'})}
+    ${svgBar(hourItems, {h:120, dH:260, secondary: hourPriorSec, secColor:'#A0AAAA'})}
     ${compareMode ? `<div class="ins-legend"><span><span class="ins-swatch" style="background:#E06820"></span>Current</span><span><span class="ins-swatch" style="background:#A0AAAA;opacity:.75"></span>Prior</span></div>` : ''}
   </div>
 
   <div class="ins-chart-card">
     <div class="ins-chart-title">CASES OPENED vs STAFF BY HOUR</div>
-    ${svgBar(hourItems, {h:120, dH:220, secondary: staffSec, secColor:'#5A9DA8'})}
+    ${svgBar(hourItems, {h:120, dH:260, secondary: staffSec, secColor:'#5A9DA8'})}
     <div class="ins-legend">
       <span><span class="ins-swatch" style="background:#E06820"></span>Cases</span>
       <span><span class="ins-swatch" style="background:#5A9DA8;opacity:.8"></span>Staff</span>
@@ -3571,13 +3570,13 @@ function renderInsights() {
 
   <div class="ins-chart-card">
     <div class="ins-chart-title">AVG CASES BY DAY OF WEEK${cmpBadge}</div>
-    ${svgBar(dowItems, {h:120, dH:220, secondary: dowPriorSec, secColor:'#A0AAAA', showVals:true})}
+    ${svgBar(dowItems, {h:120, dH:260, secondary: dowPriorSec, secColor:'#A0AAAA', showVals:true})}
     ${compareMode ? `<div class="ins-legend"><span><span class="ins-swatch" style="background:#E06820"></span>Current</span><span><span class="ins-swatch" style="background:#A0AAAA;opacity:.75"></span>Prior</span></div>` : ''}
   </div>
 
   <div class="ins-chart-card">
     <div class="ins-chart-title">DAILY CASE TREND${cmpBadge}</div>
-    ${svgTrend(byDay, {h:120, dH:220, prior: compareMode ? priorTrendPts : []})}
+    ${svgTrend(byDay, {h:120, dH:260, prior: compareMode ? priorTrendPts : []})}
     ${compareMode ? `<div class="ins-legend"><span><span class="ins-swatch" style="background:#E06820"></span>Current</span><span><span class="ins-swatch" style="background:#A0AAAA"></span>Prior (dashed)</span></div>` : ''}
   </div>
 

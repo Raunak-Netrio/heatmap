@@ -327,6 +327,7 @@ body.dark td.heat.ratio-good { background: #122018; color: #22c55e; }
 .ins-kpi-val { font-size: 20px; font-weight: 700; color: #E06820; line-height: 1.1; }
 .ins-kpi-lbl { font-size: 10px; color: #6b7a8d; margin-top: 3px; text-transform: uppercase; letter-spacing: .4px; }
 .ins-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.ins-chart-full { grid-column: 1 / -1; }
 .ins-chart-card { background: #fff; border: 1px solid #dce1e9; border-radius: 10px; padding: 14px 16px; }
 .ins-chart-title { font-size: 10.5px; font-weight: 700; color: #2B3032; margin-bottom: 10px; letter-spacing: .3px; }
 .ins-legend { display: flex; gap: 14px; margin-top: 6px; font-size: 10px; color: #6b7a8d; }
@@ -969,35 +970,60 @@ function renderInsights() {
   const gOpened   = mergeGroupData(DATA['opened']);
   const gResolved = mergeGroupData(DATA['resolved']);
   const gAvail    = mergeGroupData(AVAIL);
+  const isDark    = document.body.classList.contains('dark');
+  const gridC  = isDark ? '#2C3032' : '#eef0f4';
+  const tickC  = isDark ? '#8A9898' : '#9aabb8';
+  const labelC = isDark ? '#8A9898' : '#6b7a8d';
 
+  // ── Current period ───────────────────────────────────────────────────────
   const byHour = {}, byHourRes = {}, byHourAv = {};
   const byDow = {}, byDowDays = {};
   const byMonth = {};
+  const byDay = [];
   let totalOpen = 0, totalRes = 0, activeDays = 0;
   for (let h = 1; h <= 24; h++) { byHour[h] = 0; byHourRes[h] = 0; byHourAv[h] = 0; }
   for (let d = 0; d < 7; d++) { byDow[d] = 0; byDowDays[d] = 0; }
 
   DATES.forEach(({ key, day }) => {
-    const dO = gOpened[key]   || {};
-    const dR = gResolved[key] || {};
-    const dA = gAvail[key]    || {};
-    let dayOpen = 0;
+    const dO = gOpened[key] || {}, dR = gResolved[key] || {}, dA = gAvail[key] || {};
+    let dayOpen = 0, dayAvail = 0;
     for (let h = 1; h <= 24; h++) {
-      const o = dO[String(h)] || 0;
-      const r = dR[String(h)] || 0;
-      const a = dA[h] || 0;
+      const o = dO[String(h)] || 0, r = dR[String(h)] || 0, a = dA[h] || 0;
       byHour[h] += o; byHourRes[h] += r; byHourAv[h] += a;
-      dayOpen += o; totalOpen += o; totalRes += r;
+      dayOpen += o; totalOpen += o; totalRes += r; dayAvail += a;
     }
-    if (dayOpen > 0) activeDays++;
+    if (dayOpen > 0 || dayAvail > 0) { activeDays++; byDay.push({ v: dayOpen, label: key.slice(8) + '/' + key.slice(5,7) }); }
     const dow = DAY_NAMES.indexOf(day);
     if (dow >= 0) { byDow[dow] += dayOpen; byDowDays[dow]++; }
-    const mon = key.slice(5, 7);
-    byMonth[mon] = (byMonth[mon] || 0) + dayOpen;
+    byMonth[key.slice(5,7)] = (byMonth[key.slice(5,7)] || 0) + dayOpen;
   });
 
-  const avgPerDay = activeDays > 0 ? totalOpen / activeDays : 0;
-  const resRate   = totalOpen > 0 ? totalRes / totalOpen * 100 : 0;
+  // ── Prior period (compare mode) ──────────────────────────────────────────
+  const prByHour = {}, prByHourAv = {}, prByDow = {}, prByDowDays = {};
+  let prTotalOpen = 0, prTotalRes = 0, prActiveDays = 0;
+  for (let h = 1; h <= 24; h++) { prByHour[h] = 0; prByHourAv[h] = 0; }
+  for (let d = 0; d < 7; d++) { prByDow[d] = 0; prByDowDays[d] = 0; }
+  if (compareMode) {
+    DATES.forEach(({ key, day }) => {
+      const pk = toPriorDateKey(key);
+      const dO = gOpened[pk] || {}, dR = gResolved[pk] || {}, dA = gAvail[pk] || {};
+      let dayOpen = 0;
+      for (let h = 1; h <= 24; h++) {
+        const o = dO[String(h)] || 0, r = dR[String(h)] || 0, a = dA[h] || 0;
+        prByHour[h] += o; prByHourAv[h] += a;
+        dayOpen += o; prTotalOpen += o; prTotalRes += r;
+      }
+      if (dayOpen > 0) prActiveDays++;
+      const dow = DAY_NAMES.indexOf(day);
+      if (dow >= 0) { prByDow[dow] += dayOpen; prByDowDays[dow]++; }
+    });
+  }
+
+  // ── Derived stats ────────────────────────────────────────────────────────
+  const avgPerDay   = activeDays > 0 ? totalOpen / activeDays : 0;
+  const resRate     = totalOpen > 0 ? totalRes / totalOpen * 100 : 0;
+  const prAvgPerDay = prActiveDays > 0 ? prTotalOpen / prActiveDays : 0;
+  const prResRate   = prTotalOpen > 0 ? prTotalRes / prTotalOpen * 100 : 0;
 
   let peakH = 1, peakHVal = 0;
   for (let h = 1; h <= 24; h++) { if (byHour[h] > peakHVal) { peakHVal = byHour[h]; peakH = h; } }
@@ -1005,16 +1031,17 @@ function renderInsights() {
   const dowAvg = {};
   for (let d = 0; d < 7; d++) dowAvg[d] = byDowDays[d] > 0 ? byDow[d] / byDowDays[d] : 0;
   const peakDowEntry = Object.entries(dowAvg).sort((a, b) => b[1] - a[1])[0];
-  const peakDowName  = DAY_NAMES[peakDowEntry[0]];
+  const peakDowName  = DAY_NAMES[parseInt(peakDowEntry[0])];
 
+  const orByHour = {};
+  for (let h = 1; h <= 24; h++) orByHour[h] = byHourAv[h] > 0 ? byHour[h] / byHourAv[h] : 0;
+  const activeORHours = Object.values(orByHour).filter(v => v > 0);
+  const avgOR = activeORHours.length > 0 ? activeORHours.reduce((a,b) => a+b, 0) / activeORHours.length : 0;
   let understaffedHours = 0;
-  for (let h = 1; h <= 24; h++) {
-    if (byHourAv[h] > 0 && byHour[h] / byHourAv[h] > 1) understaffedHours++;
-  }
+  for (let h = 1; h <= 24; h++) { if (byHourAv[h] > 0 && orByHour[h] > 1) understaffedHours++; }
 
-  const afterHoursOpen = [1,2,3,4,5,6,7,8,19,20,21,22,23,24].reduce((s, h) => s + byHour[h], 0);
+  const afterHoursOpen = [1,2,3,4,5,6,7,8,19,20,21,22,23,24].reduce((s,h) => s + byHour[h], 0);
   const afterHoursPct  = totalOpen > 0 ? afterHoursOpen / totalOpen * 100 : 0;
-
   const wkdayDays = [0,1,2,3,4].reduce((s,d) => s + byDowDays[d], 0);
   const wkendDays = [5,6].reduce((s,d) => s + byDowDays[d], 0);
   const wkdayAvg  = wkdayDays > 0 ? [0,1,2,3,4].reduce((s,d) => s + byDow[d], 0) / wkdayDays : 0;
@@ -1034,94 +1061,205 @@ function renderInsights() {
     }
   }
 
+  // ── SVG helpers ──────────────────────────────────────────────────────────
   function svgBar(items, opts) {
     opts = opts || {};
-    const W = 100, H = 88, PL = 26, PB = 18, PT = 4, PR = 3;
+    const W = 200, H = opts.h || 120, PL = 30, PB = 22, PT = 12, PR = 8;
     const pw = W - PL - PR, ph = H - PT - PB;
-    const secItems = opts.secondary || [];
-    const allVals  = items.map(d => d.v).concat(secItems);
-    const maxV = Math.max(...allVals, 1);
+    const sec = opts.secondary || [], hasSec = sec.length > 0;
+    const maxV = Math.max(...items.map(d => d.v).concat(hasSec ? sec : []), 1);
     const bw = pw / items.length;
-    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:160px">`;
-    for (let t = 0; t <= 2; t++) {
-      const y = PT + ph - (t / 2) * ph;
-      s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="#eef0f4" stroke-width=".4"/>`;
-      if (t > 0) s += `<text x="${(PL-2).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4" fill="#9aabb8">${Math.round(maxV*t/2)}</text>`;
+    const barW = hasSec ? bw * .42 : bw * .65;
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH || 220}px">`;
+    for (let t = 0; t <= 4; t++) {
+      const y = PT + ph - (t / 4) * ph;
+      s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
+      s += `<text x="${(PL-3)}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4.5" fill="${tickC}">${Math.round(maxV * t / 4)}</text>`;
     }
     items.forEach((d, i) => {
-      const bh = (d.v / maxV) * ph;
-      const x  = PL + i * bw + bw * .1;
-      const w  = bw * .55;
-      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(bh,.4).toFixed(1)}" fill="${d.c || '#E06820'}" rx="1"/>`;
-      if (secItems[i] !== undefined) {
-        const sh = (secItems[i] / maxV) * ph;
-        const sx = x + w + bw * .05;
-        s += `<rect x="${sx.toFixed(1)}" y="${(PT+ph-sh).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(sh,.4).toFixed(1)}" fill="#5A9DA8" rx="1" opacity=".8"/>`;
+      const bh = Math.max((d.v / maxV) * ph, 0);
+      const x  = PL + i * bw + (hasSec ? bw * .04 : (bw - barW) / 2);
+      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c || '#E06820'}" rx="1.5"/>`;
+      if (opts.showVals && bh > 8) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="4" fill="${d.c || '#E06820'}">${d.v > 0 ? (Number.isInteger(d.v) ? d.v : d.v.toFixed(1)) : ''}</text>`;
+      if (hasSec && sec[i] !== undefined) {
+        const sh = Math.max((sec[i] / maxV) * ph, 0);
+        const sx = x + barW + bw * .04;
+        s += `<rect x="${sx.toFixed(1)}" y="${(PT+ph-sh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(sh,.5).toFixed(1)}" fill="${opts.secColor || '#A0AAAA'}" rx="1.5" opacity=".75"/>`;
       }
-      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+5).toFixed(1)}" text-anchor="middle" font-size="${items.length > 12 ? 3.2 : 4.8}" fill="#6b7a8d">${d.l}</text>`;
+      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${items.length > 18 ? 3.2 : 5}" fill="${labelC}">${d.l}</text>`;
     });
     s += '</svg>';
     return s;
   }
 
+  function svgOR(orItems, opts) {
+    opts = opts || {};
+    const W = 200, H = opts.h || 120, PL = 30, PB = 22, PT = 12, PR = 18;
+    const pw = W - PL - PR, ph = H - PT - PB;
+    const maxV = Math.max(...orItems.map(d => d.v), 1.5);
+    const bw = pw / orItems.length;
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH || 220}px">`;
+    for (let t = 0; t <= 4; t++) {
+      const v = maxV * t / 4, y = PT + ph - (v / maxV) * ph;
+      s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
+      s += `<text x="${(PL-3)}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4.5" fill="${tickC}">${v.toFixed(1)}</text>`;
+    }
+    if (maxV >= 1) {
+      const y1 = PT + ph - (1 / maxV) * ph;
+      s += `<line x1="${PL}" y1="${y1.toFixed(1)}" x2="${W-PR}" y2="${y1.toFixed(1)}" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,2"/>`;
+      s += `<text x="${W-PR+2}" y="${y1.toFixed(1)}" dominant-baseline="middle" font-size="4.5" fill="#e74c3c" font-weight="600">1.0</text>`;
+    }
+    orItems.forEach((d, i) => {
+      if (!d.v) return;
+      const bh = (d.v / maxV) * ph;
+      const barW = bw * .7, x = PL + i * bw + (bw - barW) / 2;
+      const fill = d.v >= 1 ? '#e74c3c' : d.v >= 0.7 ? '#FBA832' : '#2ecc71';
+      s += `<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity=".9"/>`;
+      if (bh > 10) s += `<text x="${(x+barW/2).toFixed(1)}" y="${(PT+ph-bh-2).toFixed(1)}" text-anchor="middle" font-size="3.8" fill="${fill}">${d.v.toFixed(2)}</text>`;
+      if (d.l) s += `<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="${orItems.length > 18 ? 3.2 : 5}" fill="${labelC}">${d.l}</text>`;
+    });
+    s += '</svg>';
+    return s;
+  }
+
+  function svgTrend(pts, opts) {
+    opts = opts || {};
+    const W = 200, H = opts.h || 120, PL = 30, PB = 22, PT = 12, PR = 8;
+    const pw = W - PL - PR, ph = H - PT - PB;
+    if (pts.length < 2) return `<p style="color:${tickC};font-size:10px;padding:16px 0">Not enough data</p>`;
+    const pr2 = opts.prior || [];
+    const maxV = Math.max(...pts.map(d=>d.v), ...pr2.map(d=>d.v), 1);
+    const step = pw / (pts.length - 1);
+    const cx = (i) => PL + i * step, cy = (v) => PT + ph - (v / maxV) * ph;
+    let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH || 220}px">`;
+    for (let t = 0; t <= 4; t++) {
+      const y = PT + ph - (t / 4) * ph;
+      s += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
+      s += `<text x="${(PL-3)}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4.5" fill="${tickC}">${Math.round(maxV * t / 4)}</text>`;
+    }
+    const areaPath = `M${cx(0).toFixed(1)},${PT+ph} ` + pts.map((d,i) => `L${cx(i).toFixed(1)},${cy(d.v).toFixed(1)}`).join(' ') + ` L${cx(pts.length-1).toFixed(1)},${PT+ph} Z`;
+    s += `<path d="${areaPath}" fill="${opts.areaC || 'rgba(224,104,32,.12)'}"/>`;
+    const linePath = pts.map((d,i) => (i?'L':'M') + cx(i).toFixed(1) + ',' + cy(d.v).toFixed(1)).join(' ');
+    s += `<path d="${linePath}" stroke="${opts.lineC || '#E06820'}" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (pr2.length > 1) {
+      const prPath = pr2.map((d,i) => (i?'L':'M') + cx(i).toFixed(1) + ',' + cy(d.v).toFixed(1)).join(' ');
+      s += `<path d="${prPath}" stroke="#A0AAAA" stroke-width="1.3" fill="none" stroke-dasharray="4,2" stroke-linejoin="round"/>`;
+    }
+    const lInt = Math.max(1, Math.ceil(pts.length / 8));
+    pts.forEach((d, i) => {
+      s += `<circle cx="${cx(i).toFixed(1)}" cy="${cy(d.v).toFixed(1)}" r="1.6" fill="${opts.lineC || '#E06820'}"/>`;
+      if (i % lInt === 0 && d.label) s += `<text x="${cx(i).toFixed(1)}" y="${H-PB+7}" text-anchor="middle" font-size="3.8" fill="${labelC}">${d.label}</text>`;
+    });
+    s += '</svg>';
+    return s;
+  }
+
+  // ── Chart data ───────────────────────────────────────────────────────────
+  const prDowAvg = {};
+  for (let d = 0; d < 7; d++) prDowAvg[d] = prByDowDays[d] > 0 ? prByDow[d] / prByDowDays[d] : 0;
+
+  const orItems = Array.from({length:24}, (_, i) => {
+    const h = i + 1;
+    return { v: byHourAv[h] > 0 ? Math.round(orByHour[h] * 100) / 100 : 0,
+             l: (h === 1 || h % 3 === 0) ? tzHourLabel(h) : '' };
+  });
   const hourItems = Array.from({length:24}, (_, i) => ({
     v: byHour[i+1], c: (i+1) === peakH ? '#F47629' : '#E06820',
-    l: (i+1) % 4 === 0 ? tzHourLabel(i+1) : ''
+    l: (i+1) === 1 || (i+1) % 4 === 0 ? tzHourLabel(i+1) : ''
   }));
-  const staffSec = Array.from({length:24}, (_, i) => byHourAv[i+1]);
-
+  const staffSec      = Array.from({length:24}, (_, i) => byHourAv[i+1]);
+  const hourPriorSec  = compareMode ? Array.from({length:24}, (_, i) => prByHour[i+1]) : [];
   const dowItems = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((lbl, i) => ({
-    v: Math.round(dowAvg[i] * 10) / 10,
-    l: lbl,
-    c: i >= 5 ? '#FBA832' : (i === parseInt(peakDowEntry[0]) ? '#F47629' : '#E06820')
+    v: Math.round(dowAvg[i] * 10) / 10, l: lbl,
+    c: i >= 5 ? '#FBA832' : i === parseInt(peakDowEntry[0]) ? '#F47629' : '#E06820'
   }));
-
+  const dowPriorSec = compareMode ? Array.from({length:7}, (_, i) => Math.round(prDowAvg[i]*10)/10) : [];
   const MN2 = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun'};
   const monthItems = Object.keys(byMonth).sort().map(mk => ({ v: byMonth[mk], l: MN2[mk], c: '#E06820' }));
+  const priorTrendPts = compareMode ? byDay.map(d => ({ v: 0, label: '' })) : [];
+  if (compareMode) {
+    DATES.forEach(({ key }, idx) => {
+      const pk = toPriorDateKey(key);
+      const dO = gOpened[pk] || {};
+      let s = 0; for (let h = 1; h <= 24; h++) s += dO[String(h)] || 0;
+      if (priorTrendPts[idx]) priorTrendPts[idx].v = s;
+    });
+  }
+
+  // ── Delta badges ─────────────────────────────────────────────────────────
+  function dBadge(cur, prior, lowerBetter) {
+    if (!compareMode || prior === 0) return '';
+    const pct = (cur - prior) / prior * 100;
+    const good = lowerBetter ? pct < 0 : pct > 0;
+    return `<span style="font-size:11px;margin-left:5px;color:${good?'#22c55e':'#e74c3c'}">${pct>0?'▲':'▼'}${Math.abs(pct).toFixed(0)}%</span>`;
+  }
 
   const SCOPE = {'1':'January','2':'February','3':'March','4':'April','5':'May','6':'June','all':'Full Year'}[currentMonth] || '';
+  const cmpBadge = compareMode ? ' <span style="font-size:10px;color:#E06820;font-weight:600">⚡ vs Prior</span>' : '';
 
   view.innerHTML = `
 <div class="ins-kpi-row">
-  <div class="ins-kpi"><div class="ins-kpi-val">${totalOpen.toLocaleString()}</div><div class="ins-kpi-lbl">Cases Opened</div></div>
-  <div class="ins-kpi"><div class="ins-kpi-val">${totalRes.toLocaleString()}</div><div class="ins-kpi-lbl">Cases Resolved</div></div>
-  <div class="ins-kpi"><div class="ins-kpi-val">${resRate.toFixed(0)}%</div><div class="ins-kpi-lbl">Resolution Rate</div></div>
-  <div class="ins-kpi"><div class="ins-kpi-val">${avgPerDay.toFixed(1)}</div><div class="ins-kpi-lbl">Avg Cases / Day</div></div>
+  <div class="ins-kpi"><div class="ins-kpi-val">${totalOpen.toLocaleString()}${dBadge(totalOpen,prTotalOpen,false)}</div><div class="ins-kpi-lbl">Cases Opened${compareMode?`<br><span style="font-size:9px;opacity:.65">Prior: ${prTotalOpen.toLocaleString()}</span>`:''}</div></div>
+  <div class="ins-kpi"><div class="ins-kpi-val">${totalRes.toLocaleString()}${dBadge(totalRes,prTotalRes,false)}</div><div class="ins-kpi-lbl">Cases Resolved${compareMode?`<br><span style="font-size:9px;opacity:.65">Prior: ${prTotalRes.toLocaleString()}</span>`:''}</div></div>
+  <div class="ins-kpi"><div class="ins-kpi-val">${resRate.toFixed(0)}%${dBadge(resRate,prResRate,false)}</div><div class="ins-kpi-lbl">Resolution Rate${compareMode?`<br><span style="font-size:9px;opacity:.65">Prior: ${prResRate.toFixed(0)}%</span>`:''}</div></div>
+  <div class="ins-kpi"><div class="ins-kpi-val">${avgPerDay.toFixed(1)}${dBadge(avgPerDay,prAvgPerDay,false)}</div><div class="ins-kpi-lbl">Avg Cases/Day${compareMode?`<br><span style="font-size:9px;opacity:.65">Prior: ${prAvgPerDay.toFixed(1)}</span>`:''}</div></div>
   <div class="ins-kpi"><div class="ins-kpi-val">${tzHourLabel(peakH)}</div><div class="ins-kpi-lbl">Peak Hour</div></div>
-  <div class="ins-kpi"><div class="ins-kpi-val">${peakDowName}</div><div class="ins-kpi-lbl">Busiest Day</div></div>
+  <div class="ins-kpi"><div class="ins-kpi-val">${avgOR.toFixed(2)}</div><div class="ins-kpi-lbl">Avg Occ. Ratio</div></div>
 </div>
+
 <div class="ins-charts">
+  <div class="ins-chart-card ins-chart-full">
+    <div class="ins-chart-title">OCCUPANCY RATIO BY HOUR &nbsp;
+      <span style="color:#2ecc71">■</span> &lt;0.7 Comfortable &nbsp;
+      <span style="color:#FBA832">■</span> 0.7–1.0 Busy &nbsp;
+      <span style="color:#e74c3c">■</span> &gt;1.0 Over Capacity
+      <span style="float:right;font-weight:400;color:#9aabb8">— — red dashed = capacity limit (OR 1.0)</span>
+    </div>
+    ${svgOR(orItems, {h:120, dH:230})}
+  </div>
+
+  <div class="ins-chart-card">
+    <div class="ins-chart-title">CASES OPENED BY HOUR${cmpBadge}</div>
+    ${svgBar(hourItems, {h:120, dH:220, secondary: hourPriorSec, secColor:'#A0AAAA'})}
+    ${compareMode ? `<div class="ins-legend"><span><span class="ins-swatch" style="background:#E06820"></span>Current</span><span><span class="ins-swatch" style="background:#A0AAAA;opacity:.75"></span>Prior</span></div>` : ''}
+  </div>
+
   <div class="ins-chart-card">
     <div class="ins-chart-title">CASES OPENED vs STAFF BY HOUR</div>
-    ${svgBar(hourItems, {secondary: staffSec})}
+    ${svgBar(hourItems, {h:120, dH:220, secondary: staffSec, secColor:'#5A9DA8'})}
     <div class="ins-legend">
-      <span><span class="ins-swatch" style="background:#E06820"></span>Cases Opened</span>
-      <span><span class="ins-swatch" style="background:#5A9DA8;opacity:.8"></span>Staff on Shift</span>
+      <span><span class="ins-swatch" style="background:#E06820"></span>Cases</span>
+      <span><span class="ins-swatch" style="background:#5A9DA8;opacity:.8"></span>Staff</span>
     </div>
   </div>
+
   <div class="ins-chart-card">
-    <div class="ins-chart-title">AVG CASES BY DAY OF WEEK</div>
-    ${svgBar(dowItems)}
+    <div class="ins-chart-title">AVG CASES BY DAY OF WEEK${cmpBadge}</div>
+    ${svgBar(dowItems, {h:120, dH:220, secondary: dowPriorSec, secColor:'#A0AAAA', showVals:true})}
+    ${compareMode ? `<div class="ins-legend"><span><span class="ins-swatch" style="background:#E06820"></span>Current</span><span><span class="ins-swatch" style="background:#A0AAAA;opacity:.75"></span>Prior</span></div>` : ''}
   </div>
+
+  <div class="ins-chart-card">
+    <div class="ins-chart-title">DAILY CASE TREND${cmpBadge}</div>
+    ${svgTrend(byDay, {h:120, dH:220, prior: compareMode ? priorTrendPts : []})}
+    ${compareMode ? `<div class="ins-legend"><span><span class="ins-swatch" style="background:#E06820"></span>Current</span><span><span class="ins-swatch" style="background:#A0AAAA"></span>Prior (dashed)</span></div>` : ''}
+  </div>
+
   ${monthItems.length > 1 ? `<div class="ins-chart-card">
     <div class="ins-chart-title">MONTHLY CASE VOLUME</div>
-    ${svgBar(monthItems)}
+    ${svgBar(monthItems, {h:120, dH:220, showVals:true})}
   </div>` : ''}
-  <div class="ins-chart-card">
-    <div class="ins-chart-title">CASES BY HOUR OF DAY (TOTAL)</div>
-    ${svgBar(hourItems)}
-  </div>
 </div>
+
 <div class="ins-bullets">
-  <div class="ins-bullets-title">AUTO-INSIGHTS — ${SCOPE}</div>
-  <div class="ins-bullet"><span class="ins-bullet-icon">🔥</span><span>Peak hour is <strong>${tzHourLabel(peakH)}</strong> with ${peakHVal.toLocaleString()} total cases (avg ${activeDays > 0 ? (peakHVal/activeDays).toFixed(1) : 0}/day)</span></div>
-  <div class="ins-bullet"><span class="ins-bullet-icon">📅</span><span>Busiest day of week is <strong>${peakDowName}</strong> averaging ${peakDowEntry[1].toFixed(1)} cases/day</span></div>
-  <div class="ins-bullet"><span class="ins-bullet-icon">✅</span><span>Resolution rate is <strong>${resRate.toFixed(0)}%</strong> — ${totalRes.toLocaleString()} of ${totalOpen.toLocaleString()} cases resolved in period</span></div>
-  ${understaffedHours > 0
-    ? `<div class="ins-bullet"><span class="ins-bullet-icon">⚠️</span><span><strong>${understaffedHours} hour${understaffedHours>1?'s':''}</strong> of the day average more cases than available staff (occupancy ratio > 1)</span></div>`
-    : `<div class="ins-bullet"><span class="ins-bullet-icon">✅</span><span>Staffing is adequate across all hours — no hour exceeds capacity (OR ≤ 1)</span></div>`}
-  <div class="ins-bullet"><span class="ins-bullet-icon">🌙</span><span>After-hours volume (before 9:00 & after 18:00) accounts for <strong>${afterHoursPct.toFixed(0)}%</strong> of all opened cases</span></div>
-  ${wkendDays > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">${wkendDiff < -10 ? '📉' : '📊'}</span><span>Weekends average <strong>${wkendAvg.toFixed(1)} cases/day</strong> vs ${wkdayAvg.toFixed(1)} on weekdays (${Math.abs(wkendDiff).toFixed(0)}% ${wkendDiff < 0 ? 'lower' : 'higher'})</span></div>` : ''}
+  <div class="ins-bullets-title">AUTO-INSIGHTS — ${SCOPE}${compareMode ? ' ⚡ COMPARE MODE' : ''}</div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">🔥</span><span>Peak hour is <strong>${tzHourLabel(peakH)}</strong> with ${peakHVal.toLocaleString()} cases total${activeDays > 0 ? ` (avg ${(peakHVal/activeDays).toFixed(1)}/day)` : ''}</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">📅</span><span>Busiest day is <strong>${peakDowName}</strong> averaging ${peakDowEntry[1].toFixed(1)} cases/day</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">📊</span><span>Avg occupancy ratio <strong>${avgOR.toFixed(2)}</strong> — ${understaffedHours > 0 ? `<strong style="color:#e74c3c">${understaffedHours} hour${understaffedHours>1?'s':''}</strong> exceed capacity (OR &gt; 1.0)` : 'all hours within capacity'}</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">✅</span><span>Resolution rate <strong>${resRate.toFixed(0)}%</strong> — ${totalRes.toLocaleString()} of ${totalOpen.toLocaleString()} cases resolved</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">🌙</span><span>After-hours (before 9:00 & after 18:00) accounts for <strong>${afterHoursPct.toFixed(0)}%</strong> of all opened cases</span></div>
+  ${wkendDays > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">${wkendDiff < -10?'📉':'📊'}</span><span>Weekends avg <strong>${wkendAvg.toFixed(1)} cases/day</strong> vs ${wkdayAvg.toFixed(1)} on weekdays (${Math.abs(wkendDiff).toFixed(0)}% ${wkendDiff<0?'lower':'higher'})</span></div>` : ''}
+  ${compareMode && prTotalOpen > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">⚡</span><span>vs prior period: case volume <strong>${totalOpen > prTotalOpen ? '▲' : '▼'} ${Math.abs((totalOpen-prTotalOpen)/prTotalOpen*100).toFixed(0)}%</strong> (${prTotalOpen.toLocaleString()} → ${totalOpen.toLocaleString()}), resolution ${prResRate.toFixed(0)}% → <strong>${resRate.toFixed(0)}%</strong></span></div>` : ''}
   ${trendHTML}
 </div>`;
 }

@@ -110,6 +110,24 @@ select:hover { border-color: #E06820; }
 }
 .stat-value { font-size: 13px; font-weight: 700; color: #2B3032; white-space: nowrap; }
 
+/* ─── Definition legend bar ──────────────────────────────────────────────── */
+.def-bar {
+  background: #f4f7fb; border-bottom: 1px solid #dce1e9;
+  padding: 5px 20px; display: flex; align-items: center; gap: 20px;
+  font-size: 11px; flex-wrap: wrap;
+}
+.def-item { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.def-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px;
+  letter-spacing: .5px; flex-shrink: 0;
+}
+.def-badge.or-badge { background: #E06820; color: #fff; }
+.def-badge.rr-badge { background: #5A9DA8; color: #fff; }
+.def-text { color: #4a5568; line-height: 1.4; }
+.def-text strong { color: #2B3032; }
+.def-sep { color: #c8d2dc; font-size: 18px; line-height: 1; }
+
 /* Content area */
 .content-area { padding: 14px 20px 20px; }
 
@@ -280,6 +298,10 @@ body.dark .upload-label:hover { background: #2C3032; border-color: #E06820; colo
 body.dark .upload-label.success { background: #122018; border-color: #1a7a40; color: #22c55e; }
 body.dark .upload-label.error { background: #201212; border-color: #8a1a1a; color: #f87171; }
 body.dark .stats-bar { background: #1E2224; border-bottom-color: #2C3032; }
+body.dark .def-bar { background: #1A1E20; border-bottom-color: #2C3032; }
+body.dark .def-text { color: #8A9898; }
+body.dark .def-text strong { color: #C8D0D0; }
+body.dark .def-sep { color: #3A4042; }
 body.dark .stat-item { border-right-color: #2C3032; }
 body.dark .stat-label { color: #8A9898; }
 body.dark .stat-value { color: #F47629; }
@@ -538,6 +560,18 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
       <span>📋</span><span id="upPdfText">Upload Roster</span>
       <input type="file" id="upPdf" accept=".pdf" multiple>
     </label>
+  </div>
+</div>
+
+<div class="def-bar">
+  <div class="def-item">
+    <span class="def-badge or-badge">OR</span>
+    <span class="def-text"><strong>Opened Ratio</strong> = Cases Opened ÷ Staff Slots Available &nbsp;·&nbsp; target ≤ 0.85 &nbsp;·&nbsp; ≥ 1.0 = over capacity</span>
+  </div>
+  <span class="def-sep">|</span>
+  <div class="def-item">
+    <span class="def-badge rr-badge">RR</span>
+    <span class="def-text"><strong>Resolved Ratio</strong> = Cases Resolved ÷ Cases Opened × 100% &nbsp;·&nbsp; higher = better</span>
   </div>
 </div>
 

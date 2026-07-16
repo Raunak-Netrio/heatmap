@@ -344,7 +344,7 @@ body.dark .ins-kpi-lbl { color: #8A9898; }
 body.dark .ins-chart-title, body.dark .ins-bullets-title { color: #E0E8E8; }
 body.dark .ins-bullet { color: #C8D0D0; border-bottom-color: #2C3032; }
 body.dark .ins-legend { color: #8A9898; }
-#ins-tooltip { position:fixed; z-index:9999; pointer-events:none; display:none; background:rgba(30,34,36,.97); color:#E0E8E8; border:1px solid #3A4042; border-radius:8px; padding:9px 13px; font-size:12px; box-shadow:0 6px 20px rgba(0,0,0,.4); line-height:1.65; max-width:270px; }
+#ins-tooltip, #rec-tooltip { position:fixed; z-index:9999; pointer-events:none; display:none; background:rgba(30,34,36,.97); color:#E0E8E8; border:1px solid #3A4042; border-radius:8px; padding:9px 13px; font-size:12px; box-shadow:0 6px 20px rgba(0,0,0,.4); line-height:1.65; max-width:270px; }
 #ins-tooltip strong { color:#F47629; }
 .ins-detail-panel { background:#fff; border:1px solid #dce1e9; border-radius:10px; padding:16px 18px; margin-top:14px; }
 .ins-detail-title { font-size:13px; font-weight:700; color:#2B3032; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #E06820; }
@@ -591,6 +591,7 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
 </div>
 <div id="tooltip"></div>
 <div id="ins-tooltip"></div>
+<div id="rec-tooltip"></div>
 
 <script src="data_full.js"></script>
 <script src="resolved_by_full.js"></script>
@@ -1088,6 +1089,10 @@ function setTimezone(val) {
 const INS_STATE = { tips: {}, metas: {}, showDetail: null };
 let _insEventsReady = false;
 
+// ── Recommendations interactivity state ──────────────────────────────────
+const REC_STATE = { tips: {}, metas: {}, showDetail: null };
+let _recEventsReady = false;
+
 function _setupInsightEvents() {
   if (_insEventsReady) return;
   _insEventsReady = true;
@@ -1117,6 +1122,39 @@ function _setupInsightEvents() {
     tipEl.style.display = 'none';
     if (INS_STATE.showDetail) INS_STATE.showDetail(INS_STATE.metas[el.dataset.ins]);
     const det = document.getElementById('ins-detail');
+    if (det && det.innerHTML) setTimeout(() => det.scrollIntoView({behavior:'smooth', block:'nearest'}), 60);
+  });
+}
+
+function _setupRecEvents() {
+  if (_recEventsReady) return;
+  _recEventsReady = true;
+  const view = document.getElementById('recsView');
+  const tipEl = document.getElementById('rec-tooltip');
+  view.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-rec]');
+    if (!el || !REC_STATE.tips[el.dataset.rec]) { tipEl.style.display = 'none'; return; }
+    tipEl.innerHTML = REC_STATE.tips[el.dataset.rec];
+    tipEl.style.display = 'block';
+  });
+  view.addEventListener('mousemove', e => {
+    if (tipEl.style.display === 'none') return;
+    const tw = tipEl.offsetWidth + 28, th = tipEl.offsetHeight + 12;
+    let lx = e.clientX + 16, ly = e.clientY - 12;
+    if (lx + tw > window.innerWidth)  lx = e.clientX - tw + 12;
+    if (ly + th > window.innerHeight) ly = e.clientY - th - 4;
+    if (ly < 4) ly = 4;
+    tipEl.style.left = lx + 'px'; tipEl.style.top = ly + 'px';
+  });
+  view.addEventListener('mouseout', e => {
+    if (!e.relatedTarget || !e.relatedTarget.closest('[data-rec]')) tipEl.style.display = 'none';
+  });
+  view.addEventListener('click', e => {
+    const el = e.target.closest('[data-rec]');
+    if (!el || !REC_STATE.metas[el.dataset.rec]) return;
+    tipEl.style.display = 'none';
+    if (REC_STATE.showDetail) REC_STATE.showDetail(REC_STATE.metas[el.dataset.rec]);
+    const det = document.getElementById('rec-detail');
     if (det && det.innerHTML) setTimeout(() => det.scrollIntoView({behavior:'smooth', block:'nearest'}), 60);
   });
 }
@@ -1652,24 +1690,39 @@ function renderRecommendations() {
   const tickC  = isDark ? '#8A9898' : '#9aabb8';
   const labelC = isDark ? '#8A9898' : '#6b7a8d';
 
-  // ── Base aggregation (mirrors renderInsights) ─────────────────────────────
+  // ── Base aggregation ──────────────────────────────────────────────────────
   const byHour = {}, byHourRes = {}, byHourAv = {};
-  const byDow  = {}, byDowDays = {};
+  const byDow  = {}, byDowDays = {}, byDowStaff = {};
   for (let h = 1; h <= 24; h++) { byHour[h] = 0; byHourRes[h] = 0; byHourAv[h] = 0; }
-  for (let d = 0; d < 7; d++)   { byDow[d]  = 0; byDowDays[d] = 0; }
-  let activeDays = 0, totalOpen = 0;
+  for (let d = 0; d < 7; d++)   { byDow[d] = 0; byDowDays[d] = 0; byDowStaff[d] = 0; }
+  let activeDays = 0;
 
-  DATES.forEach(({ key, day }) => {
+  // Per-hour raw date rows for drill-down table
+  const perHourDates = {};
+  for (let h = 1; h <= 24; h++) perHourDates[h] = [];
+  // Per-DOW raw date rows for drill-down table
+  const perDowDates = {};
+  for (let d = 0; d < 7; d++) perDowDates[d] = [];
+
+  DATES.forEach(({ key, label, day }) => {
     const dO = gOpened[key] || {}, dR = gResolved[key] || {}, dA = gAvail[key] || {};
     let dayOpen = 0, dayAvail = 0;
+    const dow = DAY_NAMES.indexOf(day);
     for (let h = 1; h <= 24; h++) {
       const o = dO[String(h)]||0, r = dR[String(h)]||0, a = dA[h]||0;
       byHour[h]+=o; byHourRes[h]+=r; byHourAv[h]+=a;
-      dayOpen+=o; totalOpen+=o; dayAvail+=a;
+      dayOpen+=o; dayAvail+=a;
+      if (o > 0 || a > 0) {
+        perHourDates[h].push({ label: label||key, day, cases: o, staff: a, resolved: r, or: a > 0 ? o/a : null });
+      }
     }
-    if (dayOpen>0||dayAvail>0) activeDays++;
-    const dow = DAY_NAMES.indexOf(day);
-    if (dow>=0) { byDow[dow]+=dayOpen; byDowDays[dow]++; }
+    if (dayOpen > 0 || dayAvail > 0) {
+      activeDays++;
+      if (dow >= 0) {
+        byDow[dow] += dayOpen; byDowDays[dow]++; byDowStaff[dow] += dayAvail;
+        perDowDates[dow].push({ label: label||key, cases: dayOpen, staff: dayAvail });
+      }
+    }
   });
 
   const orByHour = {};
@@ -1682,36 +1735,26 @@ function renderRecommendations() {
   let casesOverCapacity = 0, casesProjectedOver = 0;
 
   for (let h=1;h<=24;h++) {
-    avgCasesPerDay[h] = activeDays>0 ? byHour[h]/activeDays : 0;
-    avgStaffPerDay[h] = activeDays>0 ? byHourAv[h]/activeDays : 0;
-    if (avgCasesPerDay[h]>0) {
+    avgCasesPerDay[h] = activeDays > 0 ? byHour[h]/activeDays : 0;
+    avgStaffPerDay[h] = activeDays > 0 ? byHourAv[h]/activeDays : 0;
+    if (avgCasesPerDay[h] > 0) {
       recommendedStaff[h] = Math.ceil(avgCasesPerDay[h]/TARGET_OR);
       projectedOR[h]      = avgCasesPerDay[h]/recommendedStaff[h];
-    } else {
-      recommendedStaff[h] = 0;
-      projectedOR[h]      = 0;
-    }
+    } else { recommendedStaff[h] = 0; projectedOR[h] = 0; }
     staffGap[h] = recommendedStaff[h] - avgStaffPerDay[h];
-    if (staffGap[h]>0.3)  totalGapSlots     += staffGap[h];
-    if (staffGap[h]<-0.5) totalSurplusSlots += Math.abs(staffGap[h]);
-    if (orByHour[h]>1)    { hoursOverCap++; casesOverCapacity += byHour[h]-byHourAv[h]; }
-    if (projectedOR[h]>1) { projHoursOverCap++; casesProjectedOver += avgCasesPerDay[h]-recommendedStaff[h]; }
+    if (staffGap[h] > 0.3)  totalGapSlots     += staffGap[h];
+    if (staffGap[h] < -0.5) totalSurplusSlots += Math.abs(staffGap[h]);
+    if (orByHour[h] > 1)    { hoursOverCap++;    casesOverCapacity  += byHour[h]-byHourAv[h]; }
+    if (projectedOR[h] > 1) { projHoursOverCap++; casesProjectedOver += avgCasesPerDay[h]-recommendedStaff[h]; }
   }
-  casesOverCapacity   = Math.max(0, Math.round(casesOverCapacity));
-  casesProjectedOver  = Math.max(0, Math.round(casesProjectedOver * activeDays));
+  casesOverCapacity  = Math.max(0, Math.round(casesOverCapacity));
+  casesProjectedOver = Math.max(0, Math.round(casesProjectedOver * activeDays));
 
   // ── DOW averages ──────────────────────────────────────────────────────────
   const dowAvg = {}, dowAvgStaff = {};
   for (let d=0;d<7;d++) {
     dowAvg[d]      = byDowDays[d]>0 ? byDow[d]/byDowDays[d] : 0;
-    let tot=0, cnt=0;
-    DATES.forEach(({key,day})=>{
-      if (DAY_NAMES.indexOf(day)===d) {
-        const dA=gAvail[key]||{}; let s=0; for(let h=1;h<=24;h++) s+=dA[h]||0;
-        if(s>0){tot+=s;cnt++;}
-      }
-    });
-    dowAvgStaff[d] = cnt>0 ? tot/cnt : 0;
+    dowAvgStaff[d] = byDowDays[d]>0 ? byDowStaff[d]/byDowDays[d] : 0;
   }
   const peakDow = Object.entries(dowAvg).sort((a,b)=>b[1]-a[1])[0];
 
@@ -1730,12 +1773,12 @@ function renderRecommendations() {
   }
   const criticalRecs=[], highRecs=[], optimizeRecs=[];
   toRanges(understaffedH).forEach(r=>{
-    const hrs = r.to-r.from+1;
-    const avgOR  = Array.from({length:hrs},(_,i)=>orByHour[r.from+i]).reduce((a,b)=>a+b,0)/hrs;
-    const maxGap = Math.ceil(Math.max(...Array.from({length:hrs},(_,i)=>staffGap[r.from+i])));
-    const addedRes = Array.from({length:hrs},(_,i)=>{ const h=r.from+i; return recommendedStaff[h]-avgStaffPerDay[h]; }).reduce((a,b)=>a+b,0);
-    const item = { from:r.from, to:r.to, label:tzHourLabel(r.from)+'–'+tzHourLabel(r.to), maxGap, avgOR, addedRes:Math.ceil(addedRes) };
-    (avgOR>=1.5 ? criticalRecs : highRecs).push(item);
+    const hrs=r.to-r.from+1;
+    const avgOR =Array.from({length:hrs},(_,i)=>orByHour[r.from+i]).reduce((a,b)=>a+b,0)/hrs;
+    const maxGap=Math.ceil(Math.max(...Array.from({length:hrs},(_,i)=>staffGap[r.from+i])));
+    const addedRes=Array.from({length:hrs},(_,i)=>{const h=r.from+i;return recommendedStaff[h]-avgStaffPerDay[h];}).reduce((a,b)=>a+b,0);
+    const item={from:r.from,to:r.to,label:tzHourLabel(r.from)+'–'+tzHourLabel(r.to),maxGap,avgOR,addedRes:Math.ceil(addedRes)};
+    (avgOR>=1.5?criticalRecs:highRecs).push(item);
   });
   toRanges(overstaffedH).forEach(r=>{
     const hrs=r.to-r.from+1;
@@ -1743,12 +1786,26 @@ function renderRecommendations() {
     optimizeRecs.push({from:r.from,to:r.to,label:tzHourLabel(r.from)+'–'+tzHourLabel(r.to),surplus:avgSurp.toFixed(1)});
   });
 
-  // ── SVG helpers ───────────────────────────────────────────────────────────
+  // ── Interactive tip registry ──────────────────────────────────────────────
+  REC_STATE.tips = {}; REC_STATE.metas = {};
+  let _ri = 0;
+  function mkT(tip, meta) {
+    if (!tip) return '';
+    const k = 'r' + (++_ri);
+    REC_STATE.tips[k] = tip;
+    if (meta) REC_STATE.metas[k] = meta;
+    return ` data-rec="${k}" style="cursor:pointer"`;
+  }
+  const orCol = v => v>=1?'#e74c3c':v>=0.7?'#FBA832':'#22c55e';
+  const orStatus = v => v>=1?'⚠ Over capacity':v>=0.7?'⚡ Near limit':'✓ Within target';
+
+  // ── SVG helpers (with interactivity) ─────────────────────────────────────
   function svgBarR(items, opts) {
     opts=opts||{};
     const W=700,H=opts.h||120,PL=50,PB=22,PT=12,PR=14,pw=W-PL-PR,ph=H-PT-PB;
     const sec=opts.secondary||[], hasSec=sec.length>0;
-    const maxV=Math.max(...items.map(d=>d.v).concat(hasSec?sec:[]),1);
+    const secVals=hasSec?sec.map(s=>typeof s==='object'?s.v:s):[];
+    const maxV=Math.max(...items.map(d=>d.v).concat(secVals),1);
     const bw=pw/items.length, barW=hasSec?bw*.42:bw*.65;
     let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH||260}px;display:block">`;
     for(let t=0;t<=4;t++){
@@ -1758,10 +1815,12 @@ function renderRecommendations() {
     }
     items.forEach((d,i)=>{
       const bh=Math.max((d.v/maxV)*ph,0), x=PL+i*bw+(hasSec?bw*.04:(bw-barW)/2);
-      s+=`<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c||'#E06820'}" rx="1.5"/>`;
+      s+=`<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c||'#E06820'}" rx="1.5"${mkT(d.tip,d.meta)}/>`;
       if(hasSec&&sec[i]!==undefined){
-        const sh=Math.max((sec[i]/maxV)*ph,0), sx=x+barW+bw*.04;
-        s+=`<rect x="${sx.toFixed(1)}" y="${(PT+ph-sh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(sh,.5).toFixed(1)}" fill="${opts.secColor||'#27ae60'}" rx="1.5" opacity=".8"/>`;
+        const sv=typeof sec[i]==='object'?sec[i].v:sec[i];
+        const sh=Math.max((sv/maxV)*ph,0), sx=x+barW+bw*.04;
+        const secTip=typeof sec[i]==='object'?sec[i].tip:null, secMeta=typeof sec[i]==='object'?sec[i].meta:null;
+        s+=`<rect x="${sx.toFixed(1)}" y="${(PT+ph-sh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(sh,.5).toFixed(1)}" fill="${opts.secColor||'#27ae60'}" rx="1.5" opacity=".8"${mkT(secTip,secMeta)}/>`;
       }
       if(d.l) s+=`<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="5" fill="${labelC}">${d.l}</text>`;
     });
@@ -1779,34 +1838,174 @@ function renderRecommendations() {
       s+=`<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
       s+=`<text x="${PL-3}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4.5" fill="${tickC}">${v.toFixed(1)}</text>`;
     }
-    // capacity limit
     const y1=PT+ph-(1/maxV)*ph;
     s+=`<line x1="${PL}" y1="${y1.toFixed(1)}" x2="${W-PR}" y2="${y1.toFixed(1)}" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,2"/>`;
     s+=`<text x="${W-PR+2}" y="${y1.toFixed(1)}" dominant-baseline="middle" font-size="4" fill="#e74c3c" font-weight="600">1.0</text>`;
-    // target line
     const yt=PT+ph-(TARGET_OR/maxV)*ph;
     s+=`<line x1="${PL}" y1="${yt.toFixed(1)}" x2="${W-PR}" y2="${yt.toFixed(1)}" stroke="#27ae60" stroke-width="1" stroke-dasharray="3,2"/>`;
     s+=`<text x="${W-PR+2}" y="${yt.toFixed(1)}" dominant-baseline="middle" font-size="4" fill="#27ae60" font-weight="600">0.85</text>`;
     orItems.forEach((d,i)=>{
       if(!d.v&&d.v!==0) return;
       const bh=(Math.max(d.v,0)/maxV)*ph, barW=bw*.7, x=PL+i*bw+(bw-barW)/2;
-      const fill=d.projected ? (d.v>=1?'#e74c3c':d.v>=TARGET_OR?'#FBA832':'#27ae60')
-                              : (d.v>=1?'#e74c3c':d.v>=0.7?'#FBA832':'#2ecc71');
-      s+=`<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity="${d.projected?.75:.9}"/>`;
+      const fill=d.projected?(d.v>=1?'#e74c3c':d.v>=TARGET_OR?'#FBA832':'#27ae60'):(d.v>=1?'#e74c3c':d.v>=0.7?'#FBA832':'#2ecc71');
+      s+=`<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity="${d.projected?.75:.9}"${mkT(d.tip,d.meta)}/>`;
       if(d.l) s+=`<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="5" fill="${labelC}">${d.l}</text>`;
     });
     return s+'</svg>';
   }
 
-  // ── Chart data ─────────────────────────────────────────────────────────────
-  const lbl = h => (h===1||h%3===0)?tzHourLabel(h):'';
-  const currentORItems  = Array.from({length:24},(_,i)=>{ const h=i+1; return {v:byHourAv[h]>0?Math.round(orByHour[h]*100)/100:0, l:lbl(h)}; });
-  const projectedORItems= Array.from({length:24},(_,i)=>{ const h=i+1; return {v:recommendedStaff[h]>0?Math.round(projectedOR[h]*100)/100:0, projected:true, l:lbl(h)}; });
-  const staffCurItems   = Array.from({length:24},(_,i)=>{ const h=i+1; return {v:Math.round(avgStaffPerDay[h]*10)/10, c:'#5A9DA8', l:lbl(h)}; });
-  const staffRecSec     = Array.from({length:24},(_,i)=>Math.round(recommendedStaff[i+1]*10)/10);
-  const dowShort        = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const dowCasesItems   = dowShort.map((l,i)=>({v:Math.round(dowAvg[i]*10)/10||0,l,c:i>=5?'#FBA832':'#E06820'}));
-  const dowStaffSec     = Array.from({length:7},(_,i)=>Math.round(dowAvgStaff[i]*10)/10||0);
+  // ── Chart data (with tooltips + click metas) ──────────────────────────────
+  const hlbl = h => (h===1||h%3===0)?tzHourLabel(h):'';
+  const resRate = h => byHour[h]>0 ? (byHourRes[h]/byHour[h]*100).toFixed(0)+'%' : '—';
+
+  const currentORItems = Array.from({length:24},(_,i)=>{
+    const h=i+1; const v=byHourAv[h]>0?Math.round(orByHour[h]*100)/100:0;
+    const tip=byHourAv[h]>0
+      ?`<strong>${tzHourLabel(h)}</strong><br>OR: <strong style="color:${orCol(v)}">${v.toFixed(2)}</strong> — ${orStatus(v)}<br>Avg cases/day: <strong>${avgCasesPerDay[h].toFixed(1)}</strong><br>Avg staff/day: <strong>${avgStaffPerDay[h].toFixed(1)}</strong><br>Avg resolved/day: <strong>${(byHourRes[h]/Math.max(activeDays,1)).toFixed(1)}</strong><br>Resolution rate: <strong>${resRate(h)}</strong><br><em style="color:#9aabb8;font-size:10px">Click for day-by-day breakdown</em>`
+      :null;
+    return {v, l:hlbl(h), tip, meta:byHourAv[h]>0?{type:'rec-hour',h,source:'current'}:null};
+  });
+
+  const projectedORItems = Array.from({length:24},(_,i)=>{
+    const h=i+1; const v=recommendedStaff[h]>0?Math.round(projectedOR[h]*100)/100:0;
+    const tip=recommendedStaff[h]>0
+      ?`<strong>${tzHourLabel(h)} — Projected</strong><br>Current OR: <strong style="color:${orCol(orByHour[h])}">${orByHour[h].toFixed(2)}</strong> → Projected OR: <strong style="color:${orCol(v)}">${v.toFixed(2)}</strong><br>Recommended staff: <strong>${recommendedStaff[h]}</strong> (currently ${avgStaffPerDay[h].toFixed(1)})<br>Staff gap: <strong style="color:${staffGap[h]>0.5?'#e74c3c':'#27ae60'}">${staffGap[h]>0?'+':''}${staffGap[h].toFixed(1)} slots</strong><br><em style="color:#9aabb8;font-size:10px">Click for day-by-day breakdown</em>`
+      :null;
+    return {v, projected:true, l:hlbl(h), tip, meta:recommendedStaff[h]>0?{type:'rec-hour',h,source:'projected'}:null};
+  });
+
+  const staffCurItems = Array.from({length:24},(_,i)=>{
+    const h=i+1; const v=Math.round(avgStaffPerDay[h]*10)/10;
+    const tip=avgStaffPerDay[h]>0||avgCasesPerDay[h]>0
+      ?`<strong>${tzHourLabel(h)} — Current staff</strong><br>Avg slots/day: <strong>${v}</strong><br>Avg cases/day: <strong>${avgCasesPerDay[h].toFixed(1)}</strong><br>Current OR: <strong style="color:${orCol(orByHour[h])}">${orByHour[h].toFixed(2)}</strong><br><em style="color:#9aabb8;font-size:10px">Click for breakdown</em>`
+      :null;
+    return {v, c:'#5A9DA8', l:hlbl(h), tip, meta:tip?{type:'rec-hour',h,source:'staff'}:null};
+  });
+
+  const staffRecSec = Array.from({length:24},(_,i)=>{
+    const h=i+1; const v=Math.round(recommendedStaff[h]*10)/10;
+    const tip=v>0
+      ?`<strong>${tzHourLabel(h)} — Recommended staff</strong><br>Recommended slots: <strong>${v}</strong><br>vs current avg: <strong>${avgStaffPerDay[h].toFixed(1)}</strong><br>Gap: <strong style="color:${staffGap[h]>0.5?'#e74c3c':staffGap[h]<-0.5?'#27ae60':'#9aabb8'}">${staffGap[h]>0?'+':''}${staffGap[h].toFixed(1)}</strong><br>Projected OR: <strong style="color:${orCol(projectedOR[h])}">${projectedOR[h].toFixed(2)}</strong><br><em style="color:#9aabb8;font-size:10px">Click for breakdown</em>`
+      :null;
+    return {v, tip, meta:tip?{type:'rec-hour',h,source:'staff'}:null};
+  });
+
+  const dowShort = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dowCasesItems = dowShort.map((l,i)=>{
+    const v=Math.round(dowAvg[i]*10)/10||0;
+    const dowOR=dowAvgStaff[i]>0?dowAvg[i]/dowAvgStaff[i]:0;
+    const tip=v>0
+      ?`<strong>${DAY_NAMES[i]}</strong><br>Avg cases/day: <strong>${v}</strong><br>Total (period): <strong>${byDow[i].toLocaleString()}</strong><br>Days in period: <strong>${byDowDays[i]}</strong><br>DOW-level OR: <strong style="color:${orCol(dowOR)}">${dowOR.toFixed(2)}</strong><br><em style="color:#9aabb8;font-size:10px">Click for date breakdown</em>`
+      :null;
+    return {v, l, c:i>=5?'#FBA832':'#E06820', tip, meta:v>0?{type:'rec-dow',dow:i,name:DAY_NAMES[i]}:null};
+  });
+
+  const dowStaffSec = Array.from({length:7},(_,i)=>{
+    const v=Math.round(dowAvgStaff[i]*10)/10||0;
+    const dowOR=dowAvgStaff[i]>0?dowAvg[i]/dowAvgStaff[i]:0;
+    const tip=v>0
+      ?`<strong>${DAY_NAMES[i]} — Staff slots</strong><br>Avg slots/day: <strong>${v}</strong><br>vs avg cases: <strong>${dowAvg[i].toFixed(1)}</strong><br>DOW-level OR: <strong style="color:${orCol(dowOR)}">${dowOR.toFixed(2)}</strong>`
+      :null;
+    return {v, tip, meta:tip?{type:'rec-dow',dow:i,name:DAY_NAMES[i]}:null};
+  });
+
+  // ── Detail panel renderer ─────────────────────────────────────────────────
+  REC_STATE.showDetail = function(meta) {
+    const det = document.getElementById('rec-detail');
+    if (!det) return;
+    const kpi = (v,l) => `<div class="ins-detail-kpi"><div class="ins-detail-kpi-val">${v}</div><div class="ins-detail-kpi-lbl">${l}</div></div>`;
+    const row = (...cells) => `<div class="ins-detail-row">${cells.map(c=>`<span>${c}</span>`).join('')}</div>`;
+    const close = `<span class="ins-detail-close" onclick="document.getElementById('rec-detail').innerHTML=''">✕</span>`;
+    let html = '';
+
+    if (meta.type === 'rec-hour') {
+      const {h} = meta;
+      const orV = orByHour[h], projV = projectedOR[h];
+      const gap = staffGap[h];
+      const gapHtml = gap > 0.3
+        ? `<span style="color:#e74c3c">+${gap.toFixed(1)} slots needed</span>`
+        : gap < -0.5
+        ? `<span style="color:#27ae60">${Math.abs(gap).toFixed(1)} surplus</span>`
+        : `<span style="color:#27ae60">✓ OK</span>`;
+      const rr = byHour[h]>0 ? (byHourRes[h]/byHour[h]*100).toFixed(0)+'%' : '—';
+
+      // Sort worst OR first
+      const sorted = [...perHourDates[h]].filter(d=>d.cases>0||d.staff>0).sort((a,b)=>(b.or||0)-(a.or||0));
+      const tableRows = sorted.slice(0,15).map(d=>{
+        const oc=d.or!==null?`<span style="color:${orCol(d.or)};font-weight:700">${d.or.toFixed(2)}</span>`:'—';
+        const rr2=d.cases>0?Math.round(d.resolved/d.cases*100)+'%':'—';
+        return row(d.label, `${d.cases} cases`, `${d.staff} staff`, oc, rr2);
+      }).join('');
+
+      html = `<div class="ins-detail-panel">
+        <div class="ins-detail-title">🔍 ${tzHourLabel(h)} — Hour Detail ${close}</div>
+        <div class="ins-detail-grid">
+          ${kpi(avgCasesPerDay[h].toFixed(1),'Avg Cases/Day')}
+          ${kpi(avgStaffPerDay[h].toFixed(1),'Avg Staff/Day')}
+          ${kpi(`<span style="color:${orCol(orV)}">${orV.toFixed(2)}</span>`,'Current OR')}
+          ${kpi(recommendedStaff[h],'Recommended Staff')}
+          ${kpi(gapHtml,'Staff Gap')}
+          ${kpi(`<span style="color:${orCol(projV)}">${projV.toFixed(2)}</span>`,'Projected OR')}
+          ${kpi(rr,'Resolution Rate')}
+          ${kpi(perHourDates[h].filter(d=>d.cases>0).length,'Days with Activity')}
+        </div>
+        ${sorted.length>0?`
+          <div class="ins-detail-subtitle">WORST DAYS AT ${tzHourLabel(h).toUpperCase()} BY OR (TOP ${Math.min(sorted.length,15)} of ${sorted.length})</div>
+          <div class="ins-detail-row" style="font-weight:700;background:transparent;font-size:10px;color:#6b7a8d;padding:2px 10px">
+            <span>Date</span><span>Cases</span><span>Staff</span><span>OR</span><span>Res%</span>
+          </div>
+          <div class="ins-detail-rows">${tableRows}</div>
+        `:''}
+      </div>`;
+    }
+    else if (meta.type === 'rec-dow') {
+      const {dow, name} = meta;
+      const avgC = dowAvg[dow], avgS = dowAvgStaff[dow];
+      const dowOR = avgS > 0 ? avgC/avgS : 0;
+
+      // Top hours on this DOW
+      const hTotals = {};
+      for (let h=1;h<=24;h++) hTotals[h]=0;
+      DATES.forEach(({key,day})=>{
+        if (DAY_NAMES.indexOf(day)!==dow) return;
+        const dO=gOpened[key]||{};
+        for (let h=1;h<=24;h++) hTotals[h]+=(dO[String(h)]||0);
+      });
+      const top5h = Object.entries(hTotals).filter(([_,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      const hRows = top5h.map(([h,v])=>row(
+        tzHourLabel(Number(h)), v.toLocaleString()+' total', 'avg '+(byDowDays[dow]>0?(v/byDowDays[dow]).toFixed(1):0)+'/day'
+      )).join('');
+
+      const sorted = [...perDowDates[dow]].sort((a,b)=>b.cases-a.cases);
+      const dRows = sorted.slice(0,12).map(d=>{
+        const dOR=d.staff>0?d.cases/d.staff:null;
+        const orHtml=dOR!==null?`<span style="color:${orCol(dOR)};font-weight:700">${dOR.toFixed(2)}</span>`:'—';
+        return row(d.label, `${d.cases} cases`, `${d.staff} staff`, orHtml);
+      }).join('');
+
+      html = `<div class="ins-detail-panel">
+        <div class="ins-detail-title">📅 ${name} — Day Breakdown ${close}</div>
+        <div class="ins-detail-grid">
+          ${kpi(avgC.toFixed(1),'Avg Cases/Day')}
+          ${kpi(avgS.toFixed(1),'Avg Staff Slots/Day')}
+          ${kpi(`<span style="color:${orCol(dowOR)}">${dowOR.toFixed(2)}</span>`,'Day-Level OR')}
+          ${kpi(byDowDays[dow],'Days in Period')}
+          ${kpi(top5h.length>0?tzHourLabel(Number(top5h[0][0])):'—','Peak Hour')}
+        </div>
+        <div class="ins-detail-subtitle">BUSIEST HOURS ON ${name.toUpperCase()}S</div>
+        <div class="ins-detail-rows">${hRows||row('No data','—')}</div>
+        ${sorted.length>0?`
+          <div class="ins-detail-subtitle">BUSIEST ${name.toUpperCase()} DATES (TOP ${Math.min(sorted.length,12)} of ${sorted.length})</div>
+          <div class="ins-detail-row" style="font-weight:700;background:transparent;font-size:10px;color:#6b7a8d;padding:2px 10px">
+            <span>Date</span><span>Cases</span><span>Staff</span><span>OR</span>
+          </div>
+          <div class="ins-detail-rows">${dRows}</div>
+        `:''}
+      </div>`;
+    }
+
+    det.innerHTML = html;
+  };
 
   // ── Rec card builder ──────────────────────────────────────────────────────
   const recCard=(cls,icon,title,body)=>
@@ -1846,18 +2045,20 @@ function renderRecommendations() {
 <div class="rec-charts">
   <div class="ins-chart-card">
     <div class="ins-chart-title">CURRENT OCCUPANCY RATIO BY HOUR
-      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">red dashed = capacity limit (1.0) &nbsp; green dashed = target (0.85)</span>
+      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">hover bar for detail · click to drill down &nbsp;|&nbsp; red dashed = 1.0 · green dashed = 0.85 target</span>
     </div>
     ${svgORR(currentORItems,{h:120,dH:260})}
   </div>
   <div class="ins-chart-card">
     <div class="ins-chart-title">PROJECTED OR WITH RECOMMENDED STAFFING
-      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">green bars = within target &nbsp; amber = near limit &nbsp; red = still over</span>
+      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">hover for before/after · click to drill down</span>
     </div>
     ${svgORR(projectedORItems,{h:120,dH:260})}
   </div>
   <div class="ins-chart-card">
-    <div class="ins-chart-title">CURRENT vs RECOMMENDED STAFF — AVG PER DAY BY HOUR</div>
+    <div class="ins-chart-title">CURRENT vs RECOMMENDED STAFF — AVG PER DAY BY HOUR
+      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">hover for gap detail · click to drill down</span>
+    </div>
     ${svgBarR(staffCurItems,{h:120,dH:260,secondary:staffRecSec,secColor:'#27ae60'})}
     <div class="ins-legend">
       <span><span class="ins-swatch" style="background:#5A9DA8"></span>Current avg staff</span>
@@ -1865,14 +2066,18 @@ function renderRecommendations() {
     </div>
   </div>
   <div class="ins-chart-card">
-    <div class="ins-chart-title">AVG CASES vs AVG STAFF ON SHIFT — BY DAY OF WEEK</div>
+    <div class="ins-chart-title">AVG CASES vs AVG STAFF ON SHIFT — BY DAY OF WEEK
+      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">hover for OR · click for date list</span>
+    </div>
     ${svgBarR(dowCasesItems,{h:120,dH:260,secondary:dowStaffSec,secColor:'#5A9DA8'})}
     <div class="ins-legend">
       <span><span class="ins-swatch" style="background:#E06820"></span>Avg cases/day</span>
-      <span><span class="ins-swatch" style="background:#5A9DA8;opacity:.8"></span>Avg staff on shift (total daily slots)</span>
+      <span><span class="ins-swatch" style="background:#5A9DA8;opacity:.8"></span>Avg staff on shift</span>
     </div>
   </div>
 </div>
+
+<div id="rec-detail"></div>
 
 <div class="rec-sections">
   <div class="rec-section">
@@ -1897,6 +2102,8 @@ function renderRecommendations() {
   <div class="ins-bullet"><span class="ins-bullet-icon">⚠</span><span>Recommendations reflect <em>period averages</em> — single-day spikes may require additional flex capacity; review daily trend and anomaly data in the Insights tab for outliers</span></div>
   <div class="ins-bullet"><span class="ins-bullet-icon">🔄</span><span>This view updates automatically when new data or roster files are uploaded via the filter bar</span></div>
 </div>`;
+
+  _setupRecEvents();
 }
 
 function toggleCompare() {

@@ -1221,7 +1221,7 @@ function renderInsights() {
       byHour[h] += o; byHourRes[h] += r; byHourAv[h] += a;
       dayOpen += o; totalOpen += o; totalRes += r; dayAvail += a; dayRes += r;
     }
-    if (dayOpen > 0 || dayAvail > 0) { activeDays++; byDay.push({ v: dayOpen, key, label: key.slice(8)+'/'+key.slice(5,7), tip: '<strong>'+key+'</strong><br>Opened: '+dayOpen.toLocaleString()+' | Resolved: '+dayRes.toLocaleString()+'<br>Rate: '+(dayOpen>0?(dayRes/dayOpen*100).toFixed(0):0)+'% | Staff slots: '+dayAvail, meta: {type:'day',key,cases:dayOpen,res:dayRes,avail:dayAvail} }); }
+    if (dayOpen > 0 || dayAvail > 0) { activeDays++; byDay.push({ v: dayOpen, key, label: key.slice(8)+'/'+key.slice(5,7), tip: '<strong>'+key+'</strong><br>Opened: '+dayOpen.toLocaleString()+' | Resolved: '+dayRes.toLocaleString()+'<br>RR: '+(dayAvail>0?(dayRes/dayAvail*100).toFixed(0):0)+'% | Staff slots: '+dayAvail, meta: {type:'day',key,cases:dayOpen,res:dayRes,avail:dayAvail} }); }
     const dow = DAY_NAMES.indexOf(day);
     if (dow >= 0) { byDow[dow] += dayOpen; byDowDays[dow]++; }
     byMonth[key.slice(5,7)] = (byMonth[key.slice(5,7)] || 0) + dayOpen;
@@ -1249,10 +1249,12 @@ function renderInsights() {
   }
 
   // ── Derived stats ────────────────────────────────────────────────────────
+  const totalSlots   = Object.values(byHourAv).reduce((a,b)=>a+b,0);
+  const prTotalSlots = Object.values(prByHourAv).reduce((a,b)=>a+b,0);
   const avgPerDay   = activeDays > 0 ? totalOpen / activeDays : 0;
-  const resRate     = totalOpen > 0 ? totalRes / totalOpen * 100 : 0;
+  const resRate     = totalSlots > 0 ? totalRes / totalSlots * 100 : 0;
   const prAvgPerDay = prActiveDays > 0 ? prTotalOpen / prActiveDays : 0;
-  const prResRate   = prTotalOpen > 0 ? prTotalRes / prTotalOpen * 100 : 0;
+  const prResRate   = prTotalSlots > 0 ? prTotalRes / prTotalSlots * 100 : 0;
 
   let peakH = 1, peakHVal = 0;
   for (let h = 1; h <= 24; h++) { if (byHour[h] > peakHVal) { peakHVal = byHour[h]; peakH = h; } }
@@ -1535,7 +1537,7 @@ function renderInsights() {
     if (meta.type === 'hour') {
       const {h, cases, res, staff, or: orV} = meta;
       const orColor = orV>=1?'#e74c3c':orV>=0.7?'#FBA832':'#22c55e';
-      const rRate = cases>0?(res/cases*100).toFixed(0)+'%':'—';
+      const rRate = staff>0?(res/staff*100).toFixed(0)+'%':'—';
       const pct = totalOpen>0&&cases>0?(cases/totalOpen*100).toFixed(1)+'%':'—';
       const dowBreak = {};
       for (let d=0;d<7;d++) dowBreak[d]={total:0,count:0};
@@ -1583,7 +1585,7 @@ function renderInsights() {
     }
     else if (meta.type === 'day') {
       const {key, cases, res, avail} = meta;
-      const rRate = cases>0?(res/cases*100).toFixed(0)+'%':'—';
+      const rRate = avail>0?(res/avail*100).toFixed(0)+'%':'—';
       const dO=gOpened[key]||{}, dR=gResolved[key]||{}, dA=gAvail[key]||{};
       const hData=[];
       for (let h=1;h<=24;h++){const v=dO[String(h)]||0;if(v>0)hData.push([h,v,dR[String(h)]||0,dA[h]||0]);}
@@ -1890,7 +1892,7 @@ function renderRecommendations() {
 
   // ── Chart data (with tooltips + click metas) ──────────────────────────────
   const hlbl = h => (h===1||h%3===0)?tzHourLabel(h):'';
-  const resRate = h => byHour[h]>0 ? (byHourRes[h]/byHour[h]*100).toFixed(0)+'%' : '—';
+  const resRate = h => byHourAv[h]>0 ? (byHourRes[h]/byHourAv[h]*100).toFixed(0)+'%' : '—';
 
   const currentORItems = Array.from({length:24},(_,i)=>{
     const h=i+1; const v=byHourAv[h]>0?Math.round(orByHour[h]*100)/100:0;
@@ -1961,13 +1963,13 @@ function renderRecommendations() {
         : gap < -0.5
         ? `<span style="color:#27ae60">${Math.abs(gap).toFixed(1)} surplus</span>`
         : `<span style="color:#27ae60">✓ OK</span>`;
-      const rr = byHour[h]>0 ? (byHourRes[h]/byHour[h]*100).toFixed(0)+'%' : '—';
+      const rr = byHourAv[h]>0 ? (byHourRes[h]/byHourAv[h]*100).toFixed(0)+'%' : '—';
 
       // Sort worst OR first
       const sorted = [...perHourDates[h]].filter(d=>d.cases>0||d.staff>0).sort((a,b)=>(b.or||0)-(a.or||0));
       const tableRows = sorted.slice(0,15).map(d=>{
         const oc=d.or!==null?`<span style="color:${orCol(d.or)};font-weight:700">${d.or.toFixed(2)}</span>`:'—';
-        const rr2=d.cases>0?Math.round(d.resolved/d.cases*100)+'%':'—';
+        const rr2=d.staff>0?Math.round(d.resolved/d.staff*100)+'%':'—';
         return row(d.label, `${d.cases} cases`, `${d.staff} staff`, oc, rr2);
       }).join('');
 
@@ -2360,13 +2362,13 @@ function render() {
           td.className = 'heat ' + cls;
           if (av > 0) td.textContent = orV.toFixed(2);
         } else {
-          const rr = op > 0 ? rv / op * 100 : 0;
+          const rr = av > 0 ? rv / av * 100 : 0;
           const cls = rr >= 70 ? 'rrm-high' : rr >= 30 ? 'rrm-mid' : 'rrm-low';
           td.className = 'heat ' + cls;
-          if (op > 0) td.textContent = Math.round(rr) + '%';
+          if (av > 0) td.textContent = Math.round(rr) + '%';
         }
         const orTip = av > 0 ? (op/av).toFixed(2) : '—';
-        const rrTip = op > 0 ? Math.round(rv/op*100) + '%' : '—';
+        const rrTip = av > 0 ? Math.round(rv/av*100) + '%' : '—';
         td.title = '';
         td.style.cursor = (op > 0 || av > 0) ? 'pointer' : '';
         td.addEventListener('mouseenter', () => {
@@ -2446,14 +2448,14 @@ function render() {
         td.className = 'heat ' + (av===0&&op===0 ? 'empty' : orV>=1 ? 'orm-red' : orV>=0.7 ? 'orm-amber' : 'orm-green');
         if (av>0) td.textContent = orV.toFixed(2);
       } else {
-        const rr = op>0 ? rv/op*100 : 0;
-        td.className = 'heat ' + (op===0 ? 'empty' : rr>=70 ? 'rrm-high' : rr>=30 ? 'rrm-mid' : 'rrm-low');
-        if (op>0) td.textContent = Math.round(rr)+'%';
+        const rr = av>0 ? rv/av*100 : 0;
+        td.className = 'heat ' + (av===0 ? 'empty' : rr>=70 ? 'rrm-high' : rr>=30 ? 'rrm-mid' : 'rrm-low');
+        if (av>0) td.textContent = Math.round(rr)+'%';
       }
       td.addEventListener('mouseenter', () => {
         tooltip.style.display = 'block';
         tooltip.textContent = av===0&&op===0 ? `${tzDisp(h)}: No data`
-          : `${tzDisp(h)} total — Opened:${op} | Resolved:${rv} | OR:${av>0?(op/av).toFixed(2):'—'} | Res:${op>0?Math.round(rv/op*100)+'%':'—'} | Staff:${av}`;
+          : `${tzDisp(h)} total — Opened:${op} | Resolved:${rv} | OR:${av>0?(op/av).toFixed(2):'—'} | RR:${av>0?Math.round(rv/av*100)+'%':'—'} | Staff:${av}`;
       });
       td.addEventListener('mousemove', e => {
         tooltip.style.left = (e.clientX + 12) + 'px';
@@ -2599,7 +2601,7 @@ function showCellDetail(dateKey, hour, label, day) {
   const rv = dR[String(hour)] || 0;
   const av = dA[hour] || 0;
   const orV  = av > 0 ? op / av : null;
-  const rrPct = op > 0 ? Math.round(rv / op * 100) : null;
+  const rrPct = av > 0 ? Math.round(rv / av * 100) : null;
   const orColor = orV === null ? '#6b7a8d' : orV >= 1 ? '#e74c3c' : orV >= 0.7 ? '#FBA832' : '#2ecc71';
   const kpi = (val, lbl, color) =>
     `<div class="cdkpi"><div class="cdkpi-val" style="${color?'color:'+color:''}">${val}</div><div class="cdkpi-lbl">${lbl}</div></div>`;

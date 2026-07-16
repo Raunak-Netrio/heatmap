@@ -367,6 +367,36 @@ body.dark .ins-detail-kpi-lbl { color:#8A9898; }
 body.dark .ins-detail-row { background:#272B2C; color:#C8D0D0; }
 body.dark .ins-detail-row:nth-child(even) { background:#222628; }
 
+/* ─── Recommendations Tab ───────────────────────────────────────────────── */
+#recsView { padding:16px 20px; }
+.rec-impact-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
+.rec-impact-kpi { background:#fff; border:1px solid #dce1e9; border-radius:10px; padding:12px 14px; }
+.rec-impact-val { font-size:20px; font-weight:700; color:#E06820; line-height:1.1; }
+.rec-impact-lbl { font-size:10px; color:#6b7a8d; margin-top:3px; text-transform:uppercase; letter-spacing:.4px; }
+.rec-charts { display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:14px; }
+.rec-sections { display:flex; flex-direction:column; gap:12px; margin-bottom:14px; }
+.rec-section { background:#fff; border:1px solid #dce1e9; border-radius:10px; padding:14px 16px; }
+.rec-section-title { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#2B3032; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e8ecf0; }
+.rec-card { border-radius:8px; padding:11px 14px; margin-bottom:8px; border-left:4px solid transparent; }
+.rec-card:last-child { margin-bottom:0; }
+.rec-card-header { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.rec-icon { font-size:14px; flex-shrink:0; }
+.rec-card-title { font-size:12px; font-weight:700; color:#2B3032; }
+.rec-card-body { font-size:11.5px; color:#4a5568; line-height:1.55; }
+.rec-card.rec-critical { background:#fff5f5; border-left-color:#e74c3c; }
+.rec-card.rec-high { background:#fffbf0; border-left-color:#FBA832; }
+.rec-card.rec-optimize { background:#f0fdf4; border-left-color:#27ae60; }
+body.dark #recsView .rec-impact-kpi,
+body.dark #recsView .rec-section { background:#1E2224; border-color:#2C3032; }
+body.dark .rec-impact-val { color:#F47629; }
+body.dark .rec-impact-lbl { color:#8A9898; }
+body.dark .rec-section-title { color:#E0E8E8; border-bottom-color:#2C3032; }
+body.dark .rec-card-title { color:#E0E8E8; }
+body.dark .rec-card-body { color:#A0AAAA; }
+body.dark .rec-card.rec-critical { background:#2A1010; border-left-color:#e74c3c; }
+body.dark .rec-card.rec-high { background:#2A1E08; border-left-color:#FBA832; }
+body.dark .rec-card.rec-optimize { background:#0A1E12; border-left-color:#27ae60; }
+
 /* Peak summary card */
 .ins-peak-card { background:linear-gradient(135deg,#2B3032,#363c3f); border-radius:10px; padding:14px 20px; margin-bottom:14px; display:flex; gap:28px; flex-wrap:wrap; align-items:center; }
 .ins-peak-item { display:flex; flex-direction:column; gap:3px; }
@@ -444,6 +474,7 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
       <button id="btnInsights" onclick="setType('insights')">📈 Insights</button>
       <button id="btnOrMap" onclick="setType('or-map')">OR Map</button>
       <button id="btnResMap" onclick="setType('res-map')">% Resolved</button>
+      <button id="btnRecs" onclick="setType('recs')">💡 Recommendations</button>
     </div>
     <div class="filter-divider"></div>
     <span class="filter-label">Month</span>
@@ -554,6 +585,7 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
 </div>
 
 <div id="insightsView" style="display:none"></div>
+<div id="recsView" style="display:none"></div>
 <div class="content-area" id="cell-detail-wrap" style="display:none;padding-top:0">
   <div id="cell-detail"></div>
 </div>
@@ -894,10 +926,14 @@ function setType(t) {
   document.getElementById('btnInsights').classList.toggle('active', t === 'insights');
   document.getElementById('btnOrMap').classList.toggle('active', t === 'or-map');
   document.getElementById('btnResMap').classList.toggle('active', t === 'res-map');
-  const isIns = t === 'insights';
-  document.querySelector('.stats-bar').style.display  = isIns ? 'none' : '';
-  document.querySelector('.content-area').style.display = isIns ? 'none' : '';
-  document.getElementById('insightsView').style.display = isIns ? '' : 'none';
+  document.getElementById('btnRecs').classList.toggle('active', t === 'recs');
+  const isIns  = t === 'insights';
+  const isRecs = t === 'recs';
+  const hideHeatmap = isIns || isRecs;
+  document.querySelector('.stats-bar').style.display   = hideHeatmap ? 'none' : '';
+  document.querySelector('.content-area').style.display = hideHeatmap ? 'none' : '';
+  document.getElementById('insightsView').style.display = isIns  ? '' : 'none';
+  document.getElementById('recsView').style.display     = isRecs ? '' : 'none';
   // hide cell-detail when switching tabs
   document.getElementById('cell-detail-wrap').style.display = 'none';
   document.getElementById('cell-detail').innerHTML = '';
@@ -1606,6 +1642,263 @@ ${(anomHours.length>0||anomDows.length>0)?`<div class="ins-anomaly-section">
   _setupInsightEvents();
 }
 
+function renderRecommendations() {
+  const view = document.getElementById('recsView');
+  const gOpened   = mergeGroupData(DATA['opened']);
+  const gResolved = mergeGroupData(DATA['resolved']);
+  const gAvail    = mergeGroupData(AVAIL);
+  const isDark = document.body.classList.contains('dark');
+  const gridC  = isDark ? '#2C3032' : '#eef0f4';
+  const tickC  = isDark ? '#8A9898' : '#9aabb8';
+  const labelC = isDark ? '#8A9898' : '#6b7a8d';
+
+  // ── Base aggregation (mirrors renderInsights) ─────────────────────────────
+  const byHour = {}, byHourRes = {}, byHourAv = {};
+  const byDow  = {}, byDowDays = {};
+  for (let h = 1; h <= 24; h++) { byHour[h] = 0; byHourRes[h] = 0; byHourAv[h] = 0; }
+  for (let d = 0; d < 7; d++)   { byDow[d]  = 0; byDowDays[d] = 0; }
+  let activeDays = 0, totalOpen = 0;
+
+  DATES.forEach(({ key, day }) => {
+    const dO = gOpened[key] || {}, dR = gResolved[key] || {}, dA = gAvail[key] || {};
+    let dayOpen = 0, dayAvail = 0;
+    for (let h = 1; h <= 24; h++) {
+      const o = dO[String(h)]||0, r = dR[String(h)]||0, a = dA[h]||0;
+      byHour[h]+=o; byHourRes[h]+=r; byHourAv[h]+=a;
+      dayOpen+=o; totalOpen+=o; dayAvail+=a;
+    }
+    if (dayOpen>0||dayAvail>0) activeDays++;
+    const dow = DAY_NAMES.indexOf(day);
+    if (dow>=0) { byDow[dow]+=dayOpen; byDowDays[dow]++; }
+  });
+
+  const orByHour = {};
+  for (let h=1;h<=24;h++) orByHour[h] = byHourAv[h]>0 ? byHour[h]/byHourAv[h] : 0;
+
+  // ── Staffing analysis ─────────────────────────────────────────────────────
+  const TARGET_OR = 0.85;
+  const avgCasesPerDay = {}, avgStaffPerDay = {}, recommendedStaff = {}, staffGap = {}, projectedOR = {};
+  let totalGapSlots = 0, totalSurplusSlots = 0, hoursOverCap = 0, projHoursOverCap = 0;
+  let casesOverCapacity = 0, casesProjectedOver = 0;
+
+  for (let h=1;h<=24;h++) {
+    avgCasesPerDay[h] = activeDays>0 ? byHour[h]/activeDays : 0;
+    avgStaffPerDay[h] = activeDays>0 ? byHourAv[h]/activeDays : 0;
+    if (avgCasesPerDay[h]>0) {
+      recommendedStaff[h] = Math.ceil(avgCasesPerDay[h]/TARGET_OR);
+      projectedOR[h]      = avgCasesPerDay[h]/recommendedStaff[h];
+    } else {
+      recommendedStaff[h] = 0;
+      projectedOR[h]      = 0;
+    }
+    staffGap[h] = recommendedStaff[h] - avgStaffPerDay[h];
+    if (staffGap[h]>0.3)  totalGapSlots     += staffGap[h];
+    if (staffGap[h]<-0.5) totalSurplusSlots += Math.abs(staffGap[h]);
+    if (orByHour[h]>1)    { hoursOverCap++; casesOverCapacity += byHour[h]-byHourAv[h]; }
+    if (projectedOR[h]>1) { projHoursOverCap++; casesProjectedOver += avgCasesPerDay[h]-recommendedStaff[h]; }
+  }
+  casesOverCapacity   = Math.max(0, Math.round(casesOverCapacity));
+  casesProjectedOver  = Math.max(0, Math.round(casesProjectedOver * activeDays));
+
+  // ── DOW averages ──────────────────────────────────────────────────────────
+  const dowAvg = {}, dowAvgStaff = {};
+  for (let d=0;d<7;d++) {
+    dowAvg[d]      = byDowDays[d]>0 ? byDow[d]/byDowDays[d] : 0;
+    let tot=0, cnt=0;
+    DATES.forEach(({key,day})=>{
+      if (DAY_NAMES.indexOf(day)===d) {
+        const dA=gAvail[key]||{}; let s=0; for(let h=1;h<=24;h++) s+=dA[h]||0;
+        if(s>0){tot+=s;cnt++;}
+      }
+    });
+    dowAvgStaff[d] = cnt>0 ? tot/cnt : 0;
+  }
+  const peakDow = Object.entries(dowAvg).sort((a,b)=>b[1]-a[1])[0];
+
+  // ── Recommendation generation ─────────────────────────────────────────────
+  function toRanges(hours) {
+    const sorted=[...hours].sort((a,b)=>a-b), ranges=[];
+    let start=null, prev=null;
+    sorted.forEach(h=>{ if(prev===null||h>prev+1){if(start!==null)ranges.push({from:start,to:prev});start=h;} prev=h; });
+    if(start!==null) ranges.push({from:start,to:prev});
+    return ranges;
+  }
+  const understaffedH = [], overstaffedH = [];
+  for(let h=1;h<=24;h++){
+    if(staffGap[h]>0.5&&byHour[h]>0)  understaffedH.push(h);
+    if(staffGap[h]<-1&&byHourAv[h]>0) overstaffedH.push(h);
+  }
+  const criticalRecs=[], highRecs=[], optimizeRecs=[];
+  toRanges(understaffedH).forEach(r=>{
+    const hrs = r.to-r.from+1;
+    const avgOR  = Array.from({length:hrs},(_,i)=>orByHour[r.from+i]).reduce((a,b)=>a+b,0)/hrs;
+    const maxGap = Math.ceil(Math.max(...Array.from({length:hrs},(_,i)=>staffGap[r.from+i])));
+    const addedRes = Array.from({length:hrs},(_,i)=>{ const h=r.from+i; return recommendedStaff[h]-avgStaffPerDay[h]; }).reduce((a,b)=>a+b,0);
+    const item = { from:r.from, to:r.to, label:tzHourLabel(r.from)+'–'+tzHourLabel(r.to), maxGap, avgOR, addedRes:Math.ceil(addedRes) };
+    (avgOR>=1.5 ? criticalRecs : highRecs).push(item);
+  });
+  toRanges(overstaffedH).forEach(r=>{
+    const hrs=r.to-r.from+1;
+    const avgSurp=Math.abs(Array.from({length:hrs},(_,i)=>staffGap[r.from+i]).reduce((a,b)=>a+b,0)/hrs);
+    optimizeRecs.push({from:r.from,to:r.to,label:tzHourLabel(r.from)+'–'+tzHourLabel(r.to),surplus:avgSurp.toFixed(1)});
+  });
+
+  // ── SVG helpers ───────────────────────────────────────────────────────────
+  function svgBarR(items, opts) {
+    opts=opts||{};
+    const W=700,H=opts.h||120,PL=50,PB=22,PT=12,PR=14,pw=W-PL-PR,ph=H-PT-PB;
+    const sec=opts.secondary||[], hasSec=sec.length>0;
+    const maxV=Math.max(...items.map(d=>d.v).concat(hasSec?sec:[]),1);
+    const bw=pw/items.length, barW=hasSec?bw*.42:bw*.65;
+    let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH||260}px;display:block">`;
+    for(let t=0;t<=4;t++){
+      const y=PT+ph-(t/4)*ph;
+      s+=`<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
+      s+=`<text x="${PL-3}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4.5" fill="${tickC}">${(maxV*t/4).toFixed(1)}</text>`;
+    }
+    items.forEach((d,i)=>{
+      const bh=Math.max((d.v/maxV)*ph,0), x=PL+i*bw+(hasSec?bw*.04:(bw-barW)/2);
+      s+=`<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${d.c||'#E06820'}" rx="1.5"/>`;
+      if(hasSec&&sec[i]!==undefined){
+        const sh=Math.max((sec[i]/maxV)*ph,0), sx=x+barW+bw*.04;
+        s+=`<rect x="${sx.toFixed(1)}" y="${(PT+ph-sh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(sh,.5).toFixed(1)}" fill="${opts.secColor||'#27ae60'}" rx="1.5" opacity=".8"/>`;
+      }
+      if(d.l) s+=`<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="5" fill="${labelC}">${d.l}</text>`;
+    });
+    return s+'</svg>';
+  }
+
+  function svgORR(orItems, opts) {
+    opts=opts||{};
+    const W=700,H=opts.h||120,PL=50,PB=22,PT=12,PR=32,pw=W-PL-PR,ph=H-PT-PB;
+    const maxV=Math.max(...orItems.map(d=>d.v),1.5);
+    const bw=pw/orItems.length;
+    let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:${opts.dH||260}px;display:block">`;
+    for(let t=0;t<=4;t++){
+      const v=maxV*t/4,y=PT+ph-(v/maxV)*ph;
+      s+=`<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W-PR}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width=".5"/>`;
+      s+=`<text x="${PL-3}" y="${y.toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="4.5" fill="${tickC}">${v.toFixed(1)}</text>`;
+    }
+    // capacity limit
+    const y1=PT+ph-(1/maxV)*ph;
+    s+=`<line x1="${PL}" y1="${y1.toFixed(1)}" x2="${W-PR}" y2="${y1.toFixed(1)}" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,2"/>`;
+    s+=`<text x="${W-PR+2}" y="${y1.toFixed(1)}" dominant-baseline="middle" font-size="4" fill="#e74c3c" font-weight="600">1.0</text>`;
+    // target line
+    const yt=PT+ph-(TARGET_OR/maxV)*ph;
+    s+=`<line x1="${PL}" y1="${yt.toFixed(1)}" x2="${W-PR}" y2="${yt.toFixed(1)}" stroke="#27ae60" stroke-width="1" stroke-dasharray="3,2"/>`;
+    s+=`<text x="${W-PR+2}" y="${yt.toFixed(1)}" dominant-baseline="middle" font-size="4" fill="#27ae60" font-weight="600">0.85</text>`;
+    orItems.forEach((d,i)=>{
+      if(!d.v&&d.v!==0) return;
+      const bh=(Math.max(d.v,0)/maxV)*ph, barW=bw*.7, x=PL+i*bw+(bw-barW)/2;
+      const fill=d.projected ? (d.v>=1?'#e74c3c':d.v>=TARGET_OR?'#FBA832':'#27ae60')
+                              : (d.v>=1?'#e74c3c':d.v>=0.7?'#FBA832':'#2ecc71');
+      s+=`<rect x="${x.toFixed(1)}" y="${(PT+ph-bh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(bh,.5).toFixed(1)}" fill="${fill}" rx="1.5" opacity="${d.projected?.75:.9}"/>`;
+      if(d.l) s+=`<text x="${(PL+(i+.5)*bw).toFixed(1)}" y="${(H-PB+7).toFixed(1)}" text-anchor="middle" font-size="5" fill="${labelC}">${d.l}</text>`;
+    });
+    return s+'</svg>';
+  }
+
+  // ── Chart data ─────────────────────────────────────────────────────────────
+  const lbl = h => (h===1||h%3===0)?tzHourLabel(h):'';
+  const currentORItems  = Array.from({length:24},(_,i)=>{ const h=i+1; return {v:byHourAv[h]>0?Math.round(orByHour[h]*100)/100:0, l:lbl(h)}; });
+  const projectedORItems= Array.from({length:24},(_,i)=>{ const h=i+1; return {v:recommendedStaff[h]>0?Math.round(projectedOR[h]*100)/100:0, projected:true, l:lbl(h)}; });
+  const staffCurItems   = Array.from({length:24},(_,i)=>{ const h=i+1; return {v:Math.round(avgStaffPerDay[h]*10)/10, c:'#5A9DA8', l:lbl(h)}; });
+  const staffRecSec     = Array.from({length:24},(_,i)=>Math.round(recommendedStaff[i+1]*10)/10);
+  const dowShort        = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dowCasesItems   = dowShort.map((l,i)=>({v:Math.round(dowAvg[i]*10)/10||0,l,c:i>=5?'#FBA832':'#E06820'}));
+  const dowStaffSec     = Array.from({length:7},(_,i)=>Math.round(dowAvgStaff[i]*10)/10||0);
+
+  // ── Rec card builder ──────────────────────────────────────────────────────
+  const recCard=(cls,icon,title,body)=>
+    `<div class="rec-card rec-${cls}"><div class="rec-card-header"><span class="rec-icon">${icon}</span><span class="rec-card-title">${title}</span></div><div class="rec-card-body">${body}</div></div>`;
+  const impKpi=(val,lbl,col)=>
+    `<div class="rec-impact-kpi"><div class="rec-impact-val" style="${col?'color:'+col:''}">${val}</div><div class="rec-impact-lbl">${lbl}</div></div>`;
+
+  const critHtml = criticalRecs.length
+    ? criticalRecs.map(r=>recCard('critical','🔴',`Add staff: ${r.label}`,
+        `Hours ${r.label} average OR <strong>${r.avgOR.toFixed(2)}</strong>. Add <strong>+${r.maxGap} staff slot${r.maxGap!==1?'s':''}</strong> at peak to reach OR ≤ 0.85. ` +
+        `This block accounts for roughly <strong>${Math.round(r.maxGap/Math.max(totalGapSlots,1)*100)}%</strong> of total staffing gap.`)).join('')
+    : '<p style="color:#8a9ab0;font-size:12px;padding:4px 0">No critical understaffing detected in current data.</p>';
+
+  const highHtml = highRecs.length
+    ? highRecs.map(r=>recCard('high','🟡',`Increase coverage: ${r.label}`,
+        `Hours ${r.label} run at OR <strong>${r.avgOR.toFixed(2)}</strong>. Adding <strong>+${r.maxGap} slot${r.maxGap!==1?'s':''}</strong> brings within target. ` +
+        `Consider extending adjacent shifts by 1–2 hours rather than adding a standalone shift.`)).join('')
+    : '<p style="color:#8a9ab0;font-size:12px;padding:4px 0">No high-priority gaps detected.</p>';
+
+  const optHtml = optimizeRecs.length
+    ? optimizeRecs.map(r=>recCard('optimize','🟢',`Reallocate from: ${r.label}`,
+        `Hours ${r.label} have an average surplus of <strong>${r.surplus} staff slots</strong> vs case volume. Shifting this capacity earlier/later covers peak hours without adding net headcount.`)).join('')
+    : '<p style="color:#8a9ab0;font-size:12px;padding:4px 0">No significant overstaffing detected — staffing appears well-matched to off-peak hours.</p>';
+
+  const SCOPE = {'1':'January','2':'February','3':'March','4':'April','5':'May','6':'June','all':'Full Year'}[currentMonth]||'';
+
+  view.innerHTML = `
+<div class="rec-impact-bar">
+  ${impKpi(hoursOverCap,'Hours Over Capacity — Current','#e74c3c')}
+  ${impKpi(projHoursOverCap===0?'0':projHoursOverCap,'Hours Over Capacity — Projected',projHoursOverCap===0?'#27ae60':'#FBA832')}
+  ${impKpi('+'+Math.round(totalGapSlots*10)/10,'Avg Staff Slots to Add','#E06820')}
+  ${impKpi(Math.round(totalSurplusSlots*10)/10+' reroutable','Slots Available to Reallocate','#5A9DA8')}
+  ${impKpi(casesOverCapacity.toLocaleString(),'Cases Handled Over Capacity (Period)','#e74c3c')}
+  ${impKpi(casesProjectedOver===0?'0':casesProjectedOver.toLocaleString(),'Projected Overflow After Fix',casesProjectedOver===0?'#27ae60':'#FBA832')}
+</div>
+
+<div class="rec-charts">
+  <div class="ins-chart-card">
+    <div class="ins-chart-title">CURRENT OCCUPANCY RATIO BY HOUR
+      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">red dashed = capacity limit (1.0) &nbsp; green dashed = target (0.85)</span>
+    </div>
+    ${svgORR(currentORItems,{h:120,dH:260})}
+  </div>
+  <div class="ins-chart-card">
+    <div class="ins-chart-title">PROJECTED OR WITH RECOMMENDED STAFFING
+      <span style="float:right;font-weight:400;color:#9aabb8;font-size:9px">green bars = within target &nbsp; amber = near limit &nbsp; red = still over</span>
+    </div>
+    ${svgORR(projectedORItems,{h:120,dH:260})}
+  </div>
+  <div class="ins-chart-card">
+    <div class="ins-chart-title">CURRENT vs RECOMMENDED STAFF — AVG PER DAY BY HOUR</div>
+    ${svgBarR(staffCurItems,{h:120,dH:260,secondary:staffRecSec,secColor:'#27ae60'})}
+    <div class="ins-legend">
+      <span><span class="ins-swatch" style="background:#5A9DA8"></span>Current avg staff</span>
+      <span><span class="ins-swatch" style="background:#27ae60;opacity:.8"></span>Recommended staff</span>
+    </div>
+  </div>
+  <div class="ins-chart-card">
+    <div class="ins-chart-title">AVG CASES vs AVG STAFF ON SHIFT — BY DAY OF WEEK</div>
+    ${svgBarR(dowCasesItems,{h:120,dH:260,secondary:dowStaffSec,secColor:'#5A9DA8'})}
+    <div class="ins-legend">
+      <span><span class="ins-swatch" style="background:#E06820"></span>Avg cases/day</span>
+      <span><span class="ins-swatch" style="background:#5A9DA8;opacity:.8"></span>Avg staff on shift (total daily slots)</span>
+    </div>
+  </div>
+</div>
+
+<div class="rec-sections">
+  <div class="rec-section">
+    <div class="rec-section-title">🔴 CRITICAL — Understaffed hours (OR &gt; 1.5×): add staff immediately</div>
+    ${critHtml}
+  </div>
+  <div class="rec-section">
+    <div class="rec-section-title">🟡 HIGH PRIORITY — Understaffed hours (OR 1.0–1.5): increase coverage</div>
+    ${highHtml}
+  </div>
+  <div class="rec-section">
+    <div class="rec-section-title">🟢 OPTIMISE — Overstaffed hours: reallocate to peak windows</div>
+    ${optHtml}
+  </div>
+</div>
+
+<div class="ins-bullets" style="margin-top:0">
+  <div class="ins-bullets-title">METHODOLOGY — ${SCOPE} · ${activeDays} active days analysed</div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">📐</span><span>Target OR set at <strong>0.85</strong> — each staff slot handles up to ~1.18 cases/hour, leaving headroom for response time variation and complex cases</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">🔁</span><span>Check <strong>reallocation opportunities</strong> first — shifting surplus capacity from low-traffic hours to peak windows may achieve target OR without net headcount additions</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">📅</span><span>Busiest day is <strong>${DAY_NAMES[parseInt(peakDow[0])]}</strong> at ${Number(peakDow[1]).toFixed(1)} avg cases/day — Mon–Thu core shift coverage should be prioritised</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">⚠</span><span>Recommendations reflect <em>period averages</em> — single-day spikes may require additional flex capacity; review daily trend and anomaly data in the Insights tab for outliers</span></div>
+  <div class="ins-bullet"><span class="ins-bullet-icon">🔄</span><span>This view updates automatically when new data or roster files are uploaded via the filter bar</span></div>
+</div>`;
+}
+
 function toggleCompare() {
   compareMode = !compareMode;
   document.getElementById('compareBtn').classList.toggle('active', compareMode);
@@ -1640,6 +1933,7 @@ const tooltip = document.getElementById('tooltip');
 
 function render() {
   if (currentType === 'insights') { renderInsights(); return; }
+  if (currentType === 'recs')     { renderRecommendations(); return; }
   const isAvail  = currentType === 'avail';
   const isRatio  = currentType === 'ratio';
   const isOrMap  = currentType === 'or-map';

@@ -1,4 +1,4 @@
 {
-  "mode": "domain",
+  "mode": "allowlist",
   "emails": []
 }

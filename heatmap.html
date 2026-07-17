@@ -2874,6 +2874,31 @@ document.getElementById('upXlsx').addEventListener('change', function(e) {
   reader.readAsArrayBuffer(file);
 });
 
+function classifyDesc(text, group) {
+  const t = (text || '').toLowerCase();
+  const g = (group || '').toLowerCase();
+  if (/\b(login|logon|log.?in|password|passwd|auth|mfa|2fa|sso|sign.?in|unlock|locked.?out|credential|access denied)\b/.test(t)) return 'Login & Authentication';
+  if (/\b(wvd|avd|virtual desktop|citrix|remote desktop|rdp|rds|horizon|vdi)\b/.test(t)) return 'Virtual Desktop';
+  if (/\b(email|outlook|exchange|mailbox|calendar|meeting|inbox|smtp|imap)\b/.test(t)) return 'Email & Calendar';
+  if (/\b(teams|sharepoint|onedrive|m365|microsoft 365|office 365|o365|viva|yammer)\b/.test(t)) return 'Microsoft 365';
+  if (/\b(vpn|network|connectiv|internet|wifi|wi-fi|wireless|ethernet|firewall|dns|dhcp|bandwidth|latency|ping)\b/.test(t)) return 'Network & Connectivity';
+  if (/\b(print|printer|scan|scanner|fax|copier|toner)\b/.test(t)) return 'Printing & Scanning';
+  if (/\b(virus|malware|phishing|spam|hack|breach|ransomware|antivirus|defender|threat|suspicious|security)\b/.test(t)) return 'Security';
+  if (/\b(server|infrastructure|sql|database|backup|storage|vm |virtual machine|azure|aws|cloud|hyper.?v)\b/.test(t)) return 'Server & Infrastructure';
+  if (/\b(offboard|leaver|leaving|resign|terminat|departure)\b/.test(t)) return 'Offboarding';
+  if (/\b(onboard|new hire|new staff|new employee|joiner|new.?start)\b/.test(t)) return 'Onboarding';
+  if (/\b(slow|performance|crash|freeze|hang|unresponsive|lag|loading|memory|cpu|ram)\b/.test(t)) return 'Performance Issues';
+  if (/\b(account|user|permission|access|role|active directory|azure ad|entra|provisioning)\b/.test(t)) return 'Account & Access';
+  if (/\b(software|app(?:lication)?|install|update|upgrade|patch|license|activat|browser|chrome|firefox|edge)\b/.test(t)) return 'Software & Applications';
+  if (/\b(device|laptop|pc\b|computer|desktop|monitor|keyboard|mouse|hardware|rebuild|workstation|docking|dock|headset|webcam)\b/.test(t)) return 'Device & Hardware';
+  if (g.includes('endpoint')) return 'Endpoint Experience';
+  if (g.includes('help desk')) return 'Help Desk';
+  if (g.includes('network')) return 'Network & Connectivity';
+  if (g.includes('server')) return 'Server & Infrastructure';
+  if (g.includes('security')) return 'Security';
+  return 'General Support';
+}
+
 function parseServiceNowRows(rows) {
   if (!rows.length) throw new Error('Empty spreadsheet');
   const cols = Object.keys(rows[0]);
@@ -2888,7 +2913,7 @@ function parseServiceNowRows(rows) {
        });
   const groupCol  = findCol('assignment group','assignment_group','group','team','queue');
   const catCol    = findCol('category','cat','class');
-  const descCol   = findCol('short description','short_desc','subject','summary','title','description');
+  const descCol   = findCol('short description','short_desc','subject','summary','title','description','case');
   const prioCol   = findCol('priority','prio','urgency','severity');
   const typeCol   = findCol('type','call type','incident type','contact type','request type');
   const stateCol  = findCol('state','status','ticket status');
@@ -2946,12 +2971,13 @@ function parseServiceNowRows(rows) {
     const op = parseDT(row[openedCol]);
     if (op) {
       inc(newOpened,'All',op.dateKey,op.hourKey); inc(newOpened,grp,op.dateKey,op.hourKey); cntO++;
+      const _rawDesc = descCol ? String(row[descCol] || '').trim() : '';
       RAW_TICKETS.push({
         date:     op.dateKey,
         hour:     parseInt(op.hourKey),
         group:    grp,
-        category: catCol   ? String(row[catCol]  ||'').trim() : '',
-        shortDesc:descCol  ? String(row[descCol] ||'').trim() : '',
+        category: catCol ? String(row[catCol] || '').trim() : classifyDesc(_rawDesc, grp),
+        shortDesc: _rawDesc,
         priority: prioCol  ? String(row[prioCol] ||'').trim() : '',
         type:     typeCol  ? String(row[typeCol]  ||'').trim() : '',
         state:    stateCol ? String(row[stateCol]||'').trim() : '',

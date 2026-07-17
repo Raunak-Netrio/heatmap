@@ -3386,9 +3386,9 @@ window.qaToggle = function(id) {
   const row = document.getElementById('qa-exp-' + id);
   const tog = document.getElementById('qa-tog-' + id);
   if (!row) return;
-  const open = row.style.display !== 'none';
-  row.style.display = open ? 'none' : '';
-  if (tog) tog.style.transform = open ? '' : 'rotate(90deg)';
+  const hidden = window.getComputedStyle(row).display === 'none';
+  row.style.display = hidden ? 'table-row' : 'none';
+  if (tog) tog.style.transform = hidden ? 'rotate(90deg)' : '';
 };
 
 // ── Recommendations interactivity state ──────────────────────────────────

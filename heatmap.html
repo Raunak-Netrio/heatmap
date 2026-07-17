@@ -570,14 +570,14 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
 #auth-signout-btn:hover{color:#fff;background:rgba(255,255,255,.13)}
 body.dark #auth-card{background:#12191C;border-color:#263033}
 /* ── Timezone bar ───────────────────────────────────────────────────────── */
-.tz-bar{background:#1C2426;border-bottom:1px solid #2A3538;display:flex;align-items:center;justify-content:center;gap:0;padding:0}
-.tz-item{display:flex;align-items:center;gap:9px;padding:6px 28px;border-right:1px solid #2A3538}
-.tz-item:last-child{border-right:none}
+.tz-bar{background:#1C2426;border-bottom:1px solid #2A3538;display:flex;flex-direction:column;align-items:stretch;padding:0}
+.tz-item{display:flex;align-items:center;gap:12px;padding:5px 20px;border-bottom:1px solid #2A3538}
+.tz-item:last-child{border-bottom:none}
 .tz-label{font-size:10px;font-weight:700;color:#5A8080;text-transform:uppercase;letter-spacing:.8px;min-width:28px}
 .tz-time{font-size:13px;font-weight:600;font-family:'Courier New',monospace;color:#B8D0D0;letter-spacing:.5px}
 .tz-date{font-size:10.5px;color:#4A6060}
 body.dark .tz-bar{background:#111A1C;border-bottom-color:#1E2E30}
-body.dark .tz-item{border-right-color:#1E2E30}
+body.dark .tz-item{border-bottom-color:#1E2E30}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>

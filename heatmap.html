@@ -3102,6 +3102,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 function clearUploadedData() {
   if (!confirm('Remove uploaded Excel data? The page will reload showing built-in data only.')) return;
   localStorage.removeItem('hm_excel');
+  localStorage.removeItem('hm_tickets');
   location.reload();
 }
 
@@ -3175,7 +3176,8 @@ function parseServiceNowRows(rows) {
   const prioCol   = findCol('priority','prio','urgency','severity');
   const typeCol   = findCol('type','call type','incident type','contact type','request type');
   const stateCol  = findCol('state','status','ticket status');
-  const numCol    = findCol('number','case number','case_number','ticket number','ticket_number','case no','ticket no','case id','ticket id');
+  const numCol    = cols.find(c => /^number$/i.test(c.trim()))
+                 || findCol('case number','case_number','ticket number','ticket_number','case no','ticket no','case id','ticket id');
   if (!openedCol) throw new Error('Cannot find Opened column');
   console.log('[upload] cols:', cols.join(' | '));
   console.log('[upload] openedCol:', openedCol, '| resolvedCol:', resolvedCol, '| groupCol:', groupCol);
@@ -3288,6 +3290,9 @@ function parseServiceNowRows(rows) {
     }
     localStorage.setItem('hm_excel', JSON.stringify(stored));
   } catch(e) { console.warn('localStorage save failed:', e); }
+
+  // Persist ticket list so cell-detail works after page reload
+  try { localStorage.setItem('hm_tickets', JSON.stringify(RAW_TICKETS)); } catch(e) {}
 
   return {opened:cntO, resolved:cntR};
 }
@@ -3655,6 +3660,11 @@ function restoreUploads() {
       }
     }
   } catch(e) { console.warn('localStorage excel restore failed:', e); }
+
+  try {
+    const tickets = JSON.parse(localStorage.getItem('hm_tickets') || 'null');
+    if (tickets && Array.isArray(tickets)) RAW_TICKETS = tickets;
+  } catch(e) {}
 
   try {
     const avail = JSON.parse(localStorage.getItem('hm_avail') || 'null');

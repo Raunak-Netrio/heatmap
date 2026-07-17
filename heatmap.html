@@ -707,6 +707,7 @@ body.dark .tz-hdr-row .tz-hdr-label { color: #58C4C4; }
       <span>📋</span><span id="upPdfText">Upload Roster</span>
       <input type="file" id="upPdf" accept=".pdf" multiple>
     </label>
+    <button id="clearDataBtn" class="upload-label" onclick="clearUploadedData()" title="Remove uploaded Excel data and revert to built-in data" style="border:none;cursor:pointer;">🗑 Clear Data</button>
   </div>
 </div>
 
@@ -3073,6 +3074,12 @@ function showCellDetail(dateKey, hour, label, day) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 // ── Upload helpers ────────────────────────────────────────────────────────
+function clearUploadedData() {
+  if (!confirm('Remove uploaded Excel data? The page will reload showing built-in data only.')) return;
+  localStorage.removeItem('hm_excel');
+  location.reload();
+}
+
 function setUploadState(which, state, text) {
   const id = which === 'xlsx' ? 'Xlsx' : 'Pdf';
   document.getElementById('up' + id + 'Label').className = 'upload-label ' + state;
@@ -3216,7 +3223,19 @@ function parseServiceNowRows(rows) {
     }
   }
 
-  // Merge into DATA — replace affected dates per group
+  // Collect all dates this upload covers
+  const uploadedDates = new Set([
+    ...Object.values(newOpened).flatMap(g => Object.keys(g)),
+    ...Object.values(newResolved).flatMap(g => Object.keys(g))
+  ]);
+
+  // Wipe stale built-in data for those dates across ALL groups so nothing bleeds through
+  uploadedDates.forEach(d => {
+    Object.keys(DATA.opened).forEach(g => { delete DATA.opened[g][d]; });
+    Object.keys(DATA.resolved).forEach(g => { delete DATA.resolved[g][d]; });
+  });
+
+  // Merge uploaded data into DATA
   for (const [g, dates] of Object.entries(newOpened)) {
     if (!DATA.opened[g]) DATA.opened[g] = {};
     Object.assign(DATA.opened[g], dates);
@@ -3226,9 +3245,12 @@ function parseServiceNowRows(rows) {
     Object.assign(DATA.resolved[g], dates);
   }
 
-  // Persist delta so it survives refresh
+  // Persist so it survives refresh — also store wipedDates so restoreUploads can replay the wipe
   try {
-    const stored = JSON.parse(localStorage.getItem('hm_excel') || '{"opened":{},"resolved":{}}');
+    const stored = JSON.parse(localStorage.getItem('hm_excel') || '{"opened":{},"resolved":{},"wipedDates":[]}');
+    const wipedSet = new Set(stored.wipedDates || []);
+    uploadedDates.forEach(d => wipedSet.add(d));
+    stored.wipedDates = Array.from(wipedSet);
     for (const [g, dates] of Object.entries(newOpened)) {
       if (!stored.opened[g]) stored.opened[g] = {};
       Object.assign(stored.opened[g], dates);
@@ -3591,6 +3613,11 @@ function restoreUploads() {
   try {
     const excel = JSON.parse(localStorage.getItem('hm_excel') || 'null');
     if (excel) {
+      // Replay the wipe so stale built-in data doesn't bleed back in after refresh
+      (excel.wipedDates || []).forEach(d => {
+        Object.keys(DATA.opened).forEach(g => { delete DATA.opened[g][d]; });
+        Object.keys(DATA.resolved).forEach(g => { delete DATA.resolved[g][d]; });
+      });
       for (const [g, dates] of Object.entries(excel.opened || {})) {
         if (!DATA.opened[g]) DATA.opened[g] = {};
         Object.assign(DATA.opened[g], dates);

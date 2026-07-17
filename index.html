@@ -220,7 +220,7 @@ table.ratio-mode td.heat { min-width: 62px; width: 62px; font-size: 9px; }
 td.day-cell  { position: sticky; left: 0;     z-index: 2; }
 td.date-cell { position: sticky; left: 90px;  z-index: 2; }
 thead tr:first-child th { position: sticky; top: 0;     z-index: 3; }
-#hourHeader th           { position: sticky; top: 29px; z-index: 3; }
+#hourHeader th           { position: sticky; top: 83px; z-index: 3; }
 thead tr:first-child th:first-child { left: 0; z-index: 5; }
 #hourHeader th:nth-child(1) { left: 0;    z-index: 5; }
 #hourHeader th:nth-child(2) { left: 90px; z-index: 5; }
@@ -569,15 +569,14 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
 #auth-signout-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#7A9494;border-radius:5px;padding:0 9px;height:24px;cursor:pointer;font-size:11px;font-family:inherit;line-height:24px}
 #auth-signout-btn:hover{color:#fff;background:rgba(255,255,255,.13)}
 body.dark #auth-card{background:#12191C;border-color:#263033}
-/* ── Timezone bar ───────────────────────────────────────────────────────── */
-.tz-bar{background:#1C2426;border-bottom:1px solid #2A3538;display:flex;flex-direction:column;align-items:stretch;padding:0}
-.tz-item{display:flex;align-items:center;gap:12px;padding:5px 20px;border-bottom:1px solid #2A3538}
-.tz-item:last-child{border-bottom:none}
-.tz-label{font-size:10px;font-weight:700;color:#5A8080;text-transform:uppercase;letter-spacing:.8px;min-width:28px}
-.tz-time{font-size:13px;font-weight:600;font-family:'Courier New',monospace;color:#B8D0D0;letter-spacing:.5px}
-.tz-date{font-size:10.5px;color:#4A6060}
-body.dark .tz-bar{background:#111A1C;border-bottom-color:#1E2E30}
-body.dark .tz-item{border-bottom-color:#1E2E30}
+/* ── Timezone header rows ────────────────────────────────────────────────── */
+.tz-hdr-row th { font-size: 9.5px; font-weight: 600; padding: 3px 4px; color: #607878; position: sticky; z-index: 3; }
+.tz-hdr-row .tz-hdr-label { text-align: left; padding-left: 8px; color: #5A8080; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; font-size: 9px; left: 0; z-index: 5; }
+#tzRowET  th { top: 29px; }
+#tzRowGMT th { top: 47px; }
+#tzRowIST th { top: 65px; }
+body.dark .tz-hdr-row th { color: #486868; }
+body.dark .tz-hdr-row .tz-hdr-label { color: #4A7878; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -632,23 +631,6 @@ body.dark .tz-item{border-bottom-color:#1E2E30}
   </div>
 </div>
 
-<div class="tz-bar">
-  <div class="tz-item">
-    <span class="tz-label">EST</span>
-    <span class="tz-time" id="tz-est">--:--:--</span>
-    <span class="tz-date" id="tzd-est"></span>
-  </div>
-  <div class="tz-item">
-    <span class="tz-label">GMT</span>
-    <span class="tz-time" id="tz-gmt">--:--:--</span>
-    <span class="tz-date" id="tzd-gmt"></span>
-  </div>
-  <div class="tz-item">
-    <span class="tz-label">IST</span>
-    <span class="tz-time" id="tz-ist">--:--:--</span>
-    <span class="tz-date" id="tzd-ist"></span>
-  </div>
-</div>
 
 <div class="filter-bar">
   <div class="filter-row">
@@ -766,6 +748,15 @@ body.dark .tz-item{border-bottom-color:#1E2E30}
     <tr>
       <th class="group-header" colspan="2">Date</th>
       <th class="group-header" colspan="24" id="hourTzLabel">Hour (ET)</th>
+    </tr>
+    <tr id="tzRowET" class="tz-hdr-row">
+      <th colspan="2" class="tz-hdr-label">ET</th>
+    </tr>
+    <tr id="tzRowGMT" class="tz-hdr-row">
+      <th colspan="2" class="tz-hdr-label">GMT</th>
+    </tr>
+    <tr id="tzRowIST" class="tz-hdr-row">
+      <th colspan="2" class="tz-hdr-label">IST</th>
     </tr>
     <tr id="hourHeader">
       <th>Day</th>
@@ -4768,6 +4759,28 @@ function rebuildHourHeader() {
 }
 rebuildHourHeader();
 
+// ── Timezone header rows (static offset labels per column) ────────────────
+function buildTZHeaderRows() {
+  const rows = [
+    { id: 'tzRowET',  offsetMins: 0   },
+    { id: 'tzRowGMT', offsetMins: 240 },
+    { id: 'tzRowIST', offsetMins: 570 },
+  ];
+  rows.forEach(({ id, offsetMins }) => {
+    const row = document.getElementById(id);
+    while (row.children.length > 1) row.removeChild(row.lastChild);
+    for (let h = 1; h <= 24; h++) {
+      const th = document.createElement('th');
+      const norm = ((((h - 1) * 60 + offsetMins) % 1440) + 1440) % 1440;
+      const dispH = Math.floor(norm / 60);
+      const dispM = norm % 60;
+      th.textContent = dispM ? `${dispH}:${String(dispM).padStart(2, '0')}` : String(dispH);
+      row.appendChild(th);
+    }
+  });
+}
+buildTZHeaderRows();
+
 // ── Legend ────────────────────────────────────────────────────────────────
 const legendBar = document.getElementById('legendBar');
 PALETTE.forEach(c => {
@@ -5788,26 +5801,6 @@ applyDark();
 restoreUploads();
 render();
 
-// ── Live timezone clocks ───────────────────────────────────────────────
-(function() {
-  const TZ = [
-    { id: 'est', zone: 'America/New_York' },
-    { id: 'gmt', zone: 'Europe/London'    },
-    { id: 'ist', zone: 'Asia/Kolkata'     },
-  ];
-  function tick() {
-    const now = new Date();
-    TZ.forEach(({ id, zone }) => {
-      const tEl = document.getElementById('tz-' + id);
-      const dEl = document.getElementById('tzd-' + id);
-      if (!tEl) return;
-      tEl.textContent = now.toLocaleTimeString('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-      dEl.textContent = now.toLocaleDateString('en-GB', { timeZone: zone, weekday: 'short', day: 'numeric', month: 'short' });
-    });
-  }
-  tick();
-  setInterval(tick, 1000);
-})();
 
 // ── Password-based access control ──────────────────────────────────────
 const ALLOWLIST_URL   = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';

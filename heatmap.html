@@ -569,6 +569,15 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
 #auth-signout-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#7A9494;border-radius:5px;padding:0 9px;height:24px;cursor:pointer;font-size:11px;font-family:inherit;line-height:24px}
 #auth-signout-btn:hover{color:#fff;background:rgba(255,255,255,.13)}
 body.dark #auth-card{background:#12191C;border-color:#263033}
+/* ── Timezone bar ───────────────────────────────────────────────────────── */
+.tz-bar{background:#1C2426;border-bottom:1px solid #2A3538;display:flex;align-items:center;justify-content:center;gap:0;padding:0}
+.tz-item{display:flex;align-items:center;gap:9px;padding:6px 28px;border-right:1px solid #2A3538}
+.tz-item:last-child{border-right:none}
+.tz-label{font-size:10px;font-weight:700;color:#5A8080;text-transform:uppercase;letter-spacing:.8px;min-width:28px}
+.tz-time{font-size:13px;font-weight:600;font-family:'Courier New',monospace;color:#B8D0D0;letter-spacing:.5px}
+.tz-date{font-size:10.5px;color:#4A6060}
+body.dark .tz-bar{background:#111A1C;border-bottom-color:#1E2E30}
+body.dark .tz-item{border-right-color:#1E2E30}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -620,6 +629,24 @@ body.dark #auth-card{background:#12191C;border-color:#263033}
       <button id="auth-signout-btn" onclick="authSignOut()">Sign out</button>
     </div>
     <button id="darkToggle" onclick="toggleDark()">🌙 Dark</button>
+  </div>
+</div>
+
+<div class="tz-bar">
+  <div class="tz-item">
+    <span class="tz-label">EST</span>
+    <span class="tz-time" id="tz-est">--:--:--</span>
+    <span class="tz-date" id="tzd-est"></span>
+  </div>
+  <div class="tz-item">
+    <span class="tz-label">GMT</span>
+    <span class="tz-time" id="tz-gmt">--:--:--</span>
+    <span class="tz-date" id="tzd-gmt"></span>
+  </div>
+  <div class="tz-item">
+    <span class="tz-label">IST</span>
+    <span class="tz-time" id="tz-ist">--:--:--</span>
+    <span class="tz-date" id="tzd-ist"></span>
   </div>
 </div>
 
@@ -3588,6 +3615,27 @@ applyDark();
 
 restoreUploads();
 render();
+
+// ── Live timezone clocks ───────────────────────────────────────────────
+(function() {
+  const TZ = [
+    { id: 'est', zone: 'America/New_York' },
+    { id: 'gmt', zone: 'Europe/London'    },
+    { id: 'ist', zone: 'Asia/Kolkata'     },
+  ];
+  function tick() {
+    const now = new Date();
+    TZ.forEach(({ id, zone }) => {
+      const tEl = document.getElementById('tz-' + id);
+      const dEl = document.getElementById('tzd-' + id);
+      if (!tEl) return;
+      tEl.textContent = now.toLocaleTimeString('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      dEl.textContent = now.toLocaleDateString('en-GB', { timeZone: zone, weekday: 'short', day: 'numeric', month: 'short' });
+    });
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
 
 // ── Password-based access control ──────────────────────────────────────
 const ALLOWLIST_URL   = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';

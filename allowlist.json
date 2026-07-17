@@ -1,6 +1,9 @@
 {
-  "mode": "allowlist",
-  "emails": [
-    "raunak.panesar@netrio.com"
+  "users": [
+    {
+      "email": "raunak.panesar@netrio.com",
+      "tempHash": "8eea83317867038693958818f1746ce5e48207896f66246430aa30ea3d3a48c6",
+      "version": 1
+    }
   ]
 }

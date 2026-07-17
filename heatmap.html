@@ -552,17 +552,18 @@ td.heat.rrm-mid   { background:#5A9DA8; color:#fff; }
 td.heat.rrm-high  { background:#0D4048; color:#fff; }
 /* ── Auth overlay ──────────────────────────────────────────────────────── */
 #auth-overlay{position:fixed;inset:0;z-index:99999;background:rgba(10,14,16,.97);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
-#auth-card{background:#1A1F21;border:1px solid #2C3538;border-radius:14px;padding:38px 42px;width:340px;max-width:92vw;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.75)}
+#auth-card{background:#1A1F21;border:1px solid #2C3538;border-radius:14px;padding:38px 42px;width:350px;max-width:92vw;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.75)}
 #auth-logo{height:32px;margin-bottom:20px;background:#fff;border-radius:5px;padding:3px 12px}
-#auth-title{font-size:16px;font-weight:700;color:#DDE8E8;margin-bottom:6px}
-#auth-sub{font-size:12px;color:#607070;margin-bottom:26px;line-height:1.6}
-#auth-email-input{width:100%;background:#121A1E;border:1px solid #2C3C3E;border-radius:8px;color:#C8D8D8;font-size:13px;font-family:inherit;padding:10px 13px;outline:none;margin-bottom:10px;transition:border-color .15s}
-#auth-email-input:focus{border-color:#E06820}
-#auth-ms-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:11px 18px;border:none;border-radius:8px;background:#E06820;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s}
-#auth-ms-btn:hover{background:#C55810}
-#auth-ms-btn:disabled{opacity:.55;cursor:default}
-#auth-error{margin-top:13px;font-size:11.5px;color:#f87171;display:none;line-height:1.5}
-#auth-loading{margin-top:13px;font-size:11.5px;color:#607070;display:none}
+.auth-title{font-size:16px;font-weight:700;color:#DDE8E8;margin-bottom:6px}
+.auth-sub{font-size:12px;color:#607070;margin-bottom:22px;line-height:1.6}
+.auth-inp{width:100%;background:#121A1E;border:1px solid #2C3C3E;border-radius:8px;color:#C8D8D8;font-size:13px;font-family:inherit;padding:10px 13px;outline:none;margin-bottom:9px;transition:border-color .15s;text-align:left}
+.auth-inp:focus{border-color:#E06820}
+.auth-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:11px 18px;border:none;border-radius:8px;background:#E06820;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s;margin-top:4px}
+.auth-btn:hover{background:#C55810}
+.auth-btn:disabled{opacity:.55;cursor:default}
+.auth-err{margin-top:11px;font-size:11.5px;color:#f87171;display:none;line-height:1.5;text-align:left}
+.auth-loading{margin-top:11px;font-size:11.5px;color:#607070;display:none}
+#auth-change-who{font-size:12px;color:#8AACAC;font-family:monospace;background:#111A1E;border-radius:6px;padding:7px 10px;margin-bottom:16px;text-align:left}
 #auth-user-pill{display:none;align-items:center;gap:8px;font-size:11.5px;color:#8AABAB}
 #auth-user-name{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #auth-signout-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#7A9494;border-radius:5px;padding:0 9px;height:24px;cursor:pointer;font-size:11px;font-family:inherit;line-height:24px}
@@ -577,12 +578,26 @@ body.dark #auth-card{background:#12191C;border-color:#263033}
 <div id="auth-overlay">
   <div id="auth-card">
     <img id="auth-logo" src="netrio-logo.png" alt="Netrio">
-    <div id="auth-title">Cases Heatmap</div>
-    <div id="auth-sub">Enter your work email to continue.</div>
-    <input type="email" id="auth-email-input" placeholder="you@netrio.com" autocomplete="email">
-    <button id="auth-ms-btn" onclick="authSignIn()">Continue</button>
-    <div id="auth-error"></div>
-    <div id="auth-loading">Checking access…</div>
+    <!-- Sign-in panel -->
+    <div id="auth-login-panel">
+      <div class="auth-title">Cases Heatmap</div>
+      <div class="auth-sub">Sign in with your credentials.</div>
+      <input class="auth-inp" type="email" id="auth-email-input" placeholder="your@email.com" autocomplete="email">
+      <input class="auth-inp" type="password" id="auth-pass-input" placeholder="Password" autocomplete="current-password">
+      <button class="auth-btn" id="auth-signin-btn" onclick="authSignIn()">Sign In</button>
+      <div class="auth-err" id="auth-error"></div>
+      <div class="auth-loading" id="auth-loading">Signing in…</div>
+    </div>
+    <!-- Set-password panel (shown on first login with temp password) -->
+    <div id="auth-change-panel" style="display:none">
+      <div class="auth-title">Set Your Password</div>
+      <div class="auth-sub">First time signing in — create a password you'll use going forward.</div>
+      <div id="auth-change-who"></div>
+      <input class="auth-inp" type="password" id="auth-new-pass" placeholder="New password (min 8 characters)">
+      <input class="auth-inp" type="password" id="auth-confirm-pass" placeholder="Confirm password">
+      <button class="auth-btn" onclick="authSetPassword()">Set Password &amp; Continue</button>
+      <div class="auth-err" id="auth-change-error"></div>
+    </div>
   </div>
 </div>
 
@@ -3574,79 +3589,111 @@ applyDark();
 restoreUploads();
 render();
 
-// ── Access Control (allowlist-based) ───────────────────────────────────
-const ALLOWLIST_URL = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';
-const AUTH_SESSION_KEY = 'hm_auth_email';
+// ── Password-based access control ──────────────────────────────────────
+const ALLOWLIST_URL   = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';
+const AUTH_SESS_KEY   = 'hm_auth_v2';
+const AUTH_PW_PREFIX  = 'hm_pw_v2_';
+
+async function _sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function _fetchAllowlist() {
+  try {
+    const res = await fetch(ALLOWLIST_URL + '?t=' + Date.now());
+    return res.ok ? res.json() : null;
+  } catch { return null; }
+}
 
 async function initAuth() {
-  const saved = sessionStorage.getItem(AUTH_SESSION_KEY);
-  if (saved) {
-    const ok = await _checkAllowlist(saved);
-    if (ok) { _showApp(saved); return; }
-    sessionStorage.removeItem(AUTH_SESSION_KEY);
+  const sess = JSON.parse(sessionStorage.getItem(AUTH_SESS_KEY) || 'null');
+  if (sess?.email) {
+    const al = await _fetchAllowlist();
+    const user = al?.users?.find(u => u.email === sess.email);
+    if (user) {
+      const local = JSON.parse(localStorage.getItem(AUTH_PW_PREFIX + sess.email) || 'null');
+      if (local?.version === user.version) { _showApp(sess.email); return; }
+    }
+    sessionStorage.removeItem(AUTH_SESS_KEY);
   }
   document.getElementById('auth-overlay').style.display = 'flex';
 }
 
 async function authSignIn() {
-  const input = document.getElementById('auth-email-input');
-  const btn   = document.getElementById('auth-ms-btn');
+  const email = (document.getElementById('auth-email-input').value || '').trim().toLowerCase();
+  const pw    = document.getElementById('auth-pass-input').value;
   const errEl = document.getElementById('auth-error');
   const ldEl  = document.getElementById('auth-loading');
-  const email = (input.value || '').trim().toLowerCase();
+  const btn   = document.getElementById('auth-signin-btn');
   errEl.style.display = 'none';
-  if (!email || !email.includes('@') || !email.includes('.')) {
-    errEl.textContent = 'Please enter a valid email address.';
-    errEl.style.display = '';
-    return;
-  }
+  if (!email || !email.includes('@')) { errEl.textContent = 'Enter a valid email address.'; errEl.style.display = ''; return; }
+  if (!pw) { errEl.textContent = 'Enter your password.'; errEl.style.display = ''; return; }
   btn.disabled = true; ldEl.style.display = '';
-  const allowed = await _checkAllowlist(email);
-  if (allowed) {
-    sessionStorage.setItem(AUTH_SESSION_KEY, email);
-    _showApp(email);
-  } else {
-    errEl.textContent = 'Access denied — this email is not on the access list.';
-    errEl.style.display = '';
+  const al = await _fetchAllowlist();
+  if (!al) { errEl.textContent = 'Could not reach access list — try again.'; errEl.style.display = ''; btn.disabled = false; ldEl.style.display = 'none'; return; }
+  const user = (al.users || []).find(u => u.email === email);
+  if (!user) { errEl.textContent = 'Access denied — contact your administrator.'; errEl.style.display = ''; btn.disabled = false; ldEl.style.display = 'none'; return; }
+  const hash = await _sha256(pw);
+  // Check locally-stored personal password first
+  const local = JSON.parse(localStorage.getItem(AUTH_PW_PREFIX + email) || 'null');
+  if (local?.version === user.version && hash === local.hash) {
+    sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email }));
+    btn.disabled = false; ldEl.style.display = 'none';
+    _showApp(email); return;
   }
+  // Check temp password
+  if (user.tempHash && hash === user.tempHash) {
+    btn.disabled = false; ldEl.style.display = 'none';
+    _showChangePanel(email, user.version); return;
+  }
+  errEl.textContent = 'Incorrect password.'; errEl.style.display = '';
   btn.disabled = false; ldEl.style.display = 'none';
 }
 
-async function _checkAllowlist(email) {
-  const em = email.toLowerCase();
-  try {
-    const res = await fetch(ALLOWLIST_URL + '?t=' + Date.now());
-    if (!res.ok) return false;
-    const al = await res.json();
-    const m  = al.mode || 'domain';
-    const list = (al.emails || []).map(e => e.toLowerCase());
-    if (m === 'domain')    return em.endsWith('@netrio.com');
-    if (m === 'allowlist') return list.includes(em);
-    if (m === 'both')      return em.endsWith('@netrio.com') || list.includes(em);
-    return false;
-  } catch { return false; }
+let _cpEmail = '', _cpVersion = 1;
+function _showChangePanel(email, version) {
+  _cpEmail = email; _cpVersion = version;
+  document.getElementById('auth-login-panel').style.display = 'none';
+  document.getElementById('auth-change-panel').style.display = 'block';
+  document.getElementById('auth-change-who').textContent = email;
+}
+
+async function authSetPassword() {
+  const pw1   = document.getElementById('auth-new-pass').value;
+  const pw2   = document.getElementById('auth-confirm-pass').value;
+  const errEl = document.getElementById('auth-change-error');
+  errEl.style.display = 'none';
+  if (pw1.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = ''; return; }
+  if (pw1 !== pw2)    { errEl.textContent = 'Passwords do not match.'; errEl.style.display = ''; return; }
+  const hash = await _sha256(pw1);
+  localStorage.setItem(AUTH_PW_PREFIX + _cpEmail, JSON.stringify({ hash, version: _cpVersion }));
+  sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email: _cpEmail }));
+  _showApp(_cpEmail);
 }
 
 function _showApp(email) {
   document.getElementById('auth-overlay').style.display = 'none';
-  const pill   = document.getElementById('auth-user-pill');
-  const nameEl = document.getElementById('auth-user-name');
-  nameEl.textContent = email;
-  nameEl.title = email;
-  pill.style.display = 'flex';
+  document.getElementById('auth-user-name').textContent = email;
+  document.getElementById('auth-user-name').title = email;
+  document.getElementById('auth-user-pill').style.display = 'flex';
 }
 
 function authSignOut() {
-  sessionStorage.removeItem(AUTH_SESSION_KEY);
+  sessionStorage.removeItem(AUTH_SESS_KEY);
   document.getElementById('auth-user-pill').style.display = 'none';
-  document.getElementById('auth-error').style.display = 'none';
   document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('auth-login-panel').style.display = 'block';
+  document.getElementById('auth-change-panel').style.display = 'none';
   document.getElementById('auth-email-input').value = '';
+  document.getElementById('auth-pass-input').value = '';
+  document.getElementById('auth-error').style.display = 'none';
 }
 
-document.getElementById('auth-email-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') authSignIn();
-});
+document.getElementById('auth-email-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-pass-input').focus(); });
+document.getElementById('auth-pass-input').addEventListener('keydown',  e => { if (e.key === 'Enter') authSignIn(); });
+document.getElementById('auth-new-pass').addEventListener('keydown',    e => { if (e.key === 'Enter') document.getElementById('auth-confirm-pass').focus(); });
+document.getElementById('auth-confirm-pass').addEventListener('keydown',e => { if (e.key === 'Enter') authSetPassword(); });
 
 initAuth();
 </script>

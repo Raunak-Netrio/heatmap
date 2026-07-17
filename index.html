@@ -439,6 +439,52 @@ body.dark .ins-anomaly-title { color:#F47629; }
 body.dark .ins-anomaly-row { color:#C8D0D0; background:rgba(231,76,60,.12); }
 body.dark .ins-anomaly-val { color:#f87171; }
 
+/* Queue Analysis section */
+.qa-wrap { background:#fff; border:1px solid #dce1e9; border-radius:10px; padding:14px 16px; }
+.qa-section-title { font-size:10.5px; font-weight:700; color:#2B3032; margin:14px 0 8px; text-transform:uppercase; letter-spacing:.3px; }
+.qa-section-title:first-child { margin-top:0; }
+.qa-summary-strip { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#f4f7fb; border-radius:8px; padding:10px 14px; margin-bottom:4px; font-size:12px; }
+.qa-summary-item { color:#2B3032; }
+.qa-summary-sep { color:#dce1e9; }
+.qa-summary-hot { color:#e74c3c; }
+.qa-summary-warn { color:#E06820; }
+.qa-driver-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-bottom:4px; }
+.qa-driver-card { background:#fff8f4; border:1px solid #f0b090; border-radius:8px; padding:11px 13px; }
+.qa-driver-name { font-size:12px; font-weight:700; color:#2B3032; margin-bottom:7px; }
+.qa-driver-stats { display:flex; flex-wrap:wrap; gap:6px; }
+.qa-stat { font-size:11px; background:#f4f7fb; border-radius:4px; padding:3px 7px; color:#2B3032; }
+.qa-hot { background:#fde8e8; color:#c0392b; }
+.qa-trend { background:#eaf5fb; color:#2980b9; }
+.qa-empty { font-size:12px; color:#9aabb8; font-style:italic; padding:6px 4px; }
+body.dark .qa-wrap { background:#1E2224; border-color:#2C3032; }
+body.dark .qa-section-title { color:#E0E8E8; }
+body.dark .qa-summary-strip { background:#272B2C; }
+body.dark .qa-summary-item { color:#C8D0D0; }
+body.dark .qa-driver-card { background:#2A1610; border-color:#5A2A10; }
+body.dark .qa-driver-name { color:#E0E8E8; }
+body.dark .qa-stat { background:#272B2C; color:#C8D0D0; }
+body.dark .qa-hot { background:#3A1010; color:#f87171; }
+body.dark .qa-trend { background:#1A2730; color:#5BC0DC; }
+body.dark .qa-empty { color:#6A7878; }
+
+/* Staffing change plan */
+.rec-plan-summary { display:flex; gap:20px; flex-wrap:wrap; background:#f4f7fb; border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+.rec-plan-kpi-val { font-size:18px; font-weight:700; color:#E06820; }
+.rec-plan-kpi-lbl { font-size:9px; color:#6b7a8d; text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
+.rec-move { display:flex; align-items:center; gap:8px; padding:8px 11px; background:#f4f7fb; border-radius:6px; margin-bottom:6px; font-size:11.5px; flex-wrap:wrap; }
+.rec-move:last-child { margin-bottom:0; }
+.rec-move-from { color:#c0392b; font-weight:700; }
+.rec-move-arrow { color:#9aabb8; }
+.rec-move-to { color:#27ae60; font-weight:700; }
+.rec-move-badge { background:#E06820; color:#fff; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:auto; }
+.rec-dow-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 11px; background:#fff8f4; border-radius:5px; margin-bottom:5px; font-size:11.5px; border-left:3px solid #FBA832; flex-wrap:wrap; }
+.rec-dow-row:last-child { margin-bottom:0; }
+body.dark .rec-plan-summary { background:#272B2C; }
+body.dark .rec-plan-kpi-val { color:#F47629; }
+body.dark .rec-plan-kpi-lbl { color:#8A9898; }
+body.dark .rec-move { background:#272B2C; color:#C8D0D0; }
+body.dark .rec-dow-row { background:#2A1E08; color:#C8D0D0; }
+
 /* Cell-detail panel (heatmap click) */
 #cell-detail { background:#fff; border:1px solid #dce1e9; border-radius:10px; padding:14px 18px; }
 .cdkpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:8px; margin-top:10px; }
@@ -627,8 +673,7 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
 <div id="ins-tooltip"></div>
 <div id="rec-tooltip"></div>
 
-<script>
-const DATA = {
+<script>const DATA = {
   opened: {
     'All': {
       '2025-12-31': {'23':1,'24':1},
@@ -2082,10 +2127,8 @@ const DATA = {
       '2026-06-23': {'2':1,'6':1,'7':1}
     },
   },
-};
-</script>
-<script>
-const RESOLVED_BY = {
+};</script>
+<script>const RESOLVED_BY = {
   'All': {
       '2025-12-31': {'24':{'Jamie McCabe':1}},
       '2026-01-01': {'2':{'Jamie McCabe':1},'3':{'Jamie McCabe':1},'5':{'Carl Pelfrey':1},'6':{'Carl Pelfrey':1,'Warren Fairbairn':1},'8':{'Jamie McCabe':2},'11':{'Bhushan Bele':1},'12':{'Carl Pelfrey':1},'13':{'Carl Pelfrey':2},'14':{'Carl Pelfrey':2},'18':{'Sharin Kumar':1}},
@@ -2799,8 +2842,7 @@ const RESOLVED_BY = {
       '2026-06-22': {'3':{'Christopher Nugent':1},'5':{'Ben Heath':1},'7':{'Ben Heath':1},'9':{'Raunak Panesar':1},'10':{'Ben Heath':2},'11':{'Raunak Panesar':1},'12':{'Ben Heath':1},'13':{'Afroza Shaikh':1},'15':{'Bhushan Bele':1}},
       '2026-06-23': {'2':{'Ben Heath':1},'6':{'Christopher Nugent':1},'7':{'Ben Heath':1}}
   },
-};
-</script>
+};</script>
 <script>
 const AVAIL = {
   'All': {
@@ -3120,6 +3162,7 @@ function getTextColor(count, max) {
 
 // ── State ─────────────────────────────────────────────────────────────────
 let currentType  = 'opened';
+let RAW_TICKETS  = []; // populated on Excel upload: {date,hour,group,category,shortDesc,priority,type,state}
 let selectedGroups = ['All'];
 let currentMonth = '6';
 
@@ -3776,6 +3819,100 @@ function renderInsights() {
     det.innerHTML = html;
   };
 
+  // ── Queue Analysis ─────────────────────────────────────────────────────
+  const qaDateSet = new Set(DATES.map(d => d.key));
+  const qaGrpAll  = selectedGroups.includes('All');
+  const qaOverCap = new Set();
+  for (let h = 1; h <= 24; h++) {
+    if (byHourAv[h] > 0 && byHour[h] / byHourAv[h] >= 1.0) qaOverCap.add(h);
+  }
+  const qaTickets = RAW_TICKETS.filter(t =>
+    qaDateSet.has(t.date) && (qaGrpAll || selectedGroups.includes(t.group))
+  );
+
+  let qaHTML = '<div class="qa-empty">📋 Upload an Excel ticket file to enable queue driver and recurring issue analysis.</div>';
+  if (qaTickets.length > 0) {
+    const allDtSorted = [...qaDateSet].sort();
+    const halfBreak   = allDtSorted[Math.floor(allDtSorted.length / 2)] || '';
+    const qaTotal     = qaTickets.length;
+
+    const qaCatMap = {};
+    qaTickets.forEach(t => {
+      const cat = (t.category || '').trim() || '(uncategorized)';
+      if (!qaCatMap[cat]) qaCatMap[cat] = { count:0, days:new Set(), overCap:0, hrs:{}, h1:0, h2:0 };
+      const c = qaCatMap[cat];
+      c.count++; c.days.add(t.date);
+      if (qaOverCap.has(t.hour)) c.overCap++;
+      c.hrs[t.hour] = (c.hrs[t.hour] || 0) + 1;
+      if (t.date < halfBreak) c.h1++; else c.h2++;
+    });
+
+    const qaCatList = Object.entries(qaCatMap).map(([name, s]) => {
+      const topHr = Object.entries(s.hrs).sort((a,b) => b[1]-a[1])[0]?.[0];
+      const trend = s.h1 === 0 ? (s.h2 > 0 ? '▲ New' : '—')
+                  : s.h2 > s.h1 * 1.2 ? '▲ Rising'
+                  : s.h2 < s.h1 * 0.8 ? '▼ Falling' : '→ Stable';
+      return { name, count:s.count, days:s.days.size,
+               ocPct: s.count > 0 ? s.overCap / s.count : 0,
+               topHr: topHr ? Number(topHr) : null,
+               pct: s.count / qaTotal, trend };
+    }).sort((a,b) => b.count - a.count);
+
+    const qaDrivers = qaCatList.filter(c => c.ocPct >= 0.4 && c.count >= 3);
+    const qaConst   = qaCatList.filter(c => activeDays > 0 && c.days / activeDays >= 0.6);
+
+    const qaPrioMap = {};
+    qaTickets.forEach(t => {
+      const p = (t.priority || '').trim() || '(unknown)';
+      qaPrioMap[p] = (qaPrioMap[p] || 0) + 1;
+    });
+    const qaPrioList = Object.entries(qaPrioMap).sort((a,b) => b[1]-a[1]);
+
+    const qaChartItems = qaCatList.slice(0, 10).map(c => ({
+      v: c.count,
+      label: c.name.length > 18 ? c.name.slice(0, 16) + '…' : c.name,
+      tip: `<strong>${c.name}</strong><br>${c.count} tickets (${(c.pct*100).toFixed(0)}% of total)<br>Active ${c.days}/${activeDays} days &nbsp;·&nbsp; Over-cap: ${(c.ocPct*100).toFixed(0)}%${c.topHr ? '<br>Top hour: '+tzHourLabel(c.topHr) : ''}`,
+      meta: null
+    }));
+
+    const qaDriverCards = qaDrivers.map(c =>
+      `<div class="qa-driver-card"><div class="qa-driver-name">${c.name}</div><div class="qa-driver-stats"><span class="qa-stat"><strong>${c.count}</strong> tickets</span><span class="qa-stat qa-hot"><strong>${(c.ocPct*100).toFixed(0)}%</strong> in over-cap hrs</span><span class="qa-stat"><strong>${(c.pct*100).toFixed(0)}%</strong> of total</span>${c.topHr ? `<span class="qa-stat">Peak: <strong>${tzHourLabel(c.topHr)}</strong></span>` : ''}<span class="qa-stat qa-trend">${c.trend}</span></div></div>`
+    ).join('');
+
+    const qaConstRows = qaConst.map(c =>
+      `<div class="ins-detail-row"><span>${c.name}</span><span>${c.count}</span><span>${c.days}/${activeDays} days</span><span>${(c.pct*100).toFixed(0)}%</span><span>${c.trend}</span><span>${c.topHr ? tzHourLabel(c.topHr) : '—'}</span></div>`
+    ).join('');
+
+    const qaPrioKPIs = qaPrioList.slice(0, 4).map(([p, n]) =>
+      `<div class="ins-detail-kpi"><div class="ins-detail-kpi-val">${n}</div><div class="ins-detail-kpi-lbl">${p}</div></div>`
+    ).join('');
+
+    qaHTML = `
+      <div class="qa-summary-strip">
+        <div class="qa-summary-item"><strong>${Object.keys(qaCatMap).length}</strong> categories detected</div>
+        <div class="qa-summary-sep">|</div>
+        <div class="qa-summary-item"><strong>${qaTotal.toLocaleString()}</strong> tickets analysed</div>
+        <div class="qa-summary-sep">|</div>
+        <div class="qa-summary-item qa-summary-hot"><strong>${qaDrivers.length}</strong> queue driver${qaDrivers.length !== 1 ? 's' : ''}</div>
+        <div class="qa-summary-sep">|</div>
+        <div class="qa-summary-item qa-summary-warn"><strong>${qaConst.length}</strong> constant issue${qaConst.length !== 1 ? 's' : ''}</div>
+      </div>
+      ${qaDrivers.length > 0
+        ? `<div class="qa-section-title">🔴 Queue Drivers — ≥40% of tickets arrive in over-capacity hours</div><div class="qa-driver-grid">${qaDriverCards}</div>`
+        : `<div class="qa-section-title" style="color:#5A9DA8">✅ No queue drivers detected — no category concentrates ≥40% in over-cap hours</div>`}
+      ${qaConst.length > 0 ? `
+        <div class="qa-section-title">🟡 Constant Issues — present on ≥60% of active days</div>
+        <div class="ins-detail-row" style="font-weight:700;background:transparent;font-size:10px;color:#6b7a8d;padding:2px 10px">
+          <span>Category</span><span>Tickets</span><span>Days active</span><span>% of total</span><span>Trend</span><span>Top hour</span>
+        </div>
+        <div class="ins-detail-rows">${qaConstRows}</div>` : ''}
+      <div class="qa-section-title">📊 Top Categories by Volume</div>
+      ${svgBar(qaChartItems, {h:120, dH:220, showVals:true})}
+      ${qaPrioList.length > 0 ? `
+        <div class="qa-section-title">🎯 Priority Breakdown</div>
+        <div class="ins-detail-grid">${qaPrioKPIs}</div>` : ''}`;
+  }
+
   view.innerHTML = `
 <div class="ins-peak-card">
   <div class="ins-peak-item">
@@ -3883,6 +4020,10 @@ ${(anomHours.length>0||anomDows.length>0)?`<div class="ins-anomaly-section">
   ${wkendDays > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">${wkendDiff < -10?'📉':'📊'}</span><span>Weekends avg <strong>${wkendAvg.toFixed(1)} cases/day</strong> vs ${wkdayAvg.toFixed(1)} on weekdays (${Math.abs(wkendDiff).toFixed(0)}% ${wkendDiff<0?'lower':'higher'})</span></div>` : ''}
   ${compareMode && prTotalOpen > 0 ? `<div class="ins-bullet"><span class="ins-bullet-icon">⚡</span><span>vs prior period: case volume <strong>${totalOpen > prTotalOpen ? '▲' : '▼'} ${Math.abs((totalOpen-prTotalOpen)/prTotalOpen*100).toFixed(0)}%</strong> (${prTotalOpen.toLocaleString()} → ${totalOpen.toLocaleString()}), resolution ${prResRate.toFixed(0)}% → <strong>${resRate.toFixed(0)}%</strong></span></div>` : ''}
   ${trendHTML}
+</div>
+<div class="qa-wrap" style="margin-top:14px">
+  <div class="ins-bullets-title">🔎 QUEUE ANALYSIS${qaOverCap.size > 0 ? ' &nbsp;·&nbsp; ' + qaOverCap.size + ' OVER-CAP HOUR' + (qaOverCap.size > 1 ? 'S' : '') : ''}${qaTickets.length > 0 ? ' &nbsp;·&nbsp; ' + qaTickets.length.toLocaleString() + ' TICKETS' : ''}</div>
+  ${qaHTML}
 </div>
 <div id="ins-detail"></div>`;
   _setupInsightEvents();
@@ -4240,6 +4381,65 @@ function renderRecommendations() {
 
   const SCOPE = {'1':'January','2':'February','3':'March','4':'April','5':'May','6':'June','all':'Full Year'}[currentMonth]||'';
 
+  // ── Staffing Change Plan ──────────────────────────────────────────────────
+  const spGapHrs = [], spSurplusHrs = [];
+  for (let h = 1; h <= 24; h++) {
+    if (staffGap[h] > 0.5 && byHour[h] > 0)     spGapHrs.push({ h, gap: staffGap[h], or: orByHour[h] });
+    if (staffGap[h] < -0.5 && byHourAv[h] > 0)  spSurplusHrs.push({ h, surplus: -staffGap[h] });
+  }
+  spGapHrs.sort((a,b) => b.or - a.or);
+  spSurplusHrs.sort((a,b) => b.surplus - a.surplus);
+
+  const spMoves = [];
+  const spRemS = spSurplusHrs.map(s => ({...s}));
+  const spRemG = spGapHrs.map(g => ({...g}));
+  let _si = 0, _gi = 0;
+  while (_si < spRemS.length && _gi < spRemG.length && spMoves.length < 5) {
+    const surp = spRemS[_si], gap = spRemG[_gi];
+    const slots = Math.min(surp.surplus, gap.gap);
+    if (slots >= 0.3) {
+      spMoves.push({ from: surp.h, to: gap.h, slots: Math.ceil(slots) });
+      surp.surplus -= slots; gap.gap -= slots;
+    }
+    if (surp.surplus < 0.3) _si++;
+    else if (gap.gap < 0.3) _gi++;
+    else { _si++; _gi++; }
+  }
+  const netReallocatable = Math.min(Math.round(totalSurplusSlots*10)/10, Math.round(totalGapSlots*10)/10);
+  const netNewHires      = Math.max(0, Math.round((totalGapSlots - totalSurplusSlots)*10)/10);
+
+  const dowNeeds = [];
+  for (let d = 0; d < 7; d++) {
+    if (!byDowDays[d]) continue;
+    const avgC = dowAvg[d], avgS = dowAvgStaff[d];
+    const or = avgS > 0 ? avgC/avgS : 0;
+    if (or > 0.85) {
+      const rec = Math.ceil(avgC/TARGET_OR);
+      dowNeeds.push({ day:DAY_NAMES[d], or, add:Math.max(0,rec-Math.round(avgS)), avgC:avgC.toFixed(1), avgS:avgS.toFixed(1) });
+    }
+  }
+  dowNeeds.sort((a,b) => b.or - a.or);
+
+  const quickWins = [];
+  for (let h = 1; h <= 24; h++) {
+    if (orByHour[h] > 1.0 && staffGap[h] > 0 && staffGap[h] <= 1.2)
+      quickWins.push({ h, or: orByHour[h] });
+  }
+  quickWins.sort((a,b) => b.or - a.or);
+
+  const planMoveHtml = spMoves.length > 0
+    ? spMoves.map(m =>
+        `<div class="rec-move"><span class="rec-move-from">🔴 ${tzHourLabel(m.from)}</span><span class="rec-move-arrow">→</span><span class="rec-move-to">🟢 ${tzHourLabel(m.to)}</span><span style="color:#9aabb8;font-size:11px">move ${m.slots} slot${m.slots!==1?'s':''} per active day</span><span class="rec-move-badge">+${m.slots} at ${tzHourLabel(m.to)}</span></div>`).join('')
+    : '<p style="color:#8a9ab0;font-size:12px;padding:4px 0">Staffing appears balanced — no reallocation moves identified.</p>';
+
+  const planDowHtml = dowNeeds.map(d =>
+    `<div class="rec-dow-row"><span><strong>${d.day}</strong></span><span style="color:#9aabb8">avg ${d.avgC} cases / ${d.avgS} staff (OR ${d.or.toFixed(2)})</span>${d.add>0?`<span style="color:#E06820;font-weight:700">+${d.add} slot${d.add!==1?'s':''}/day</span>`:`<span style="color:#FBA832;font-weight:700">Shift timing review</span>`}</div>`
+  ).join('');
+
+  const planQuickHtml = quickWins.slice(0,5).map(w =>
+    `<div class="ins-detail-row"><span>${tzHourLabel(w.h)}</span><span>OR ${w.or.toFixed(2)}</span><span style="color:#27ae60;font-weight:600">+1 slot resolves it</span></div>`
+  ).join('');
+
   view.innerHTML = `
 <div class="rec-impact-bar">
   ${impKpi(hoursOverCap,'Hours Over Capacity — Current','#e74c3c')}
@@ -4299,6 +4499,23 @@ function renderRecommendations() {
   <div class="rec-section">
     <div class="rec-section-title">🟢 OPTIMISE — Overstaffed hours: reallocate to peak windows</div>
     ${optHtml}
+  </div>
+  <div class="rec-section">
+    <div class="rec-section-title">📋 STAFFING CHANGE PLAN — specific actions to take immediately</div>
+    <div class="rec-plan-summary">
+      <div><div class="rec-plan-kpi-val">${Math.round(netReallocatable*10)/10}</div><div class="rec-plan-kpi-lbl">Slots Realloc.</div></div>
+      <div><div class="rec-plan-kpi-val" style="color:${netNewHires>0?'#e74c3c':'#27ae60'}">${netNewHires>0?'+'+Math.round(netNewHires*10)/10:'0'}</div><div class="rec-plan-kpi-lbl">Net New Hires</div></div>
+      <div><div class="rec-plan-kpi-val" style="color:#5A9DA8">${spMoves.length}</div><div class="rec-plan-kpi-lbl">Shift Moves</div></div>
+      <div><div class="rec-plan-kpi-val" style="color:#FBA832">${dowNeeds.length}</div><div class="rec-plan-kpi-lbl">Days to Adjust</div></div>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:#6b7a8d;text-transform:uppercase;letter-spacing:.3px;margin-bottom:7px">🔄 Reallocation Moves — shift capacity from surplus → gap hours</div>
+    ${planMoveHtml}
+    ${dowNeeds.length>0?`
+    <div style="font-size:10px;font-weight:700;color:#6b7a8d;text-transform:uppercase;letter-spacing:.3px;margin:12px 0 7px">📅 Day-of-Week Adjustments</div>
+    ${planDowHtml}`:''}
+    ${quickWins.length>0?`
+    <div style="font-size:10px;font-weight:700;color:#6b7a8d;text-transform:uppercase;letter-spacing:.3px;margin:12px 0 7px">⚡ Quick Wins — +1 slot immediately resolves these hours</div>
+    <div class="ins-detail-rows">${planQuickHtml}</div>`:''}
   </div>
 </div>
 
@@ -4837,10 +5054,16 @@ function parseServiceNowRows(rows) {
          return (lc.includes('resolved') || lc.includes('closed') || lc.includes('resolve'))
            && !lc.includes('by') && !lc.includes('note') && !lc.includes('comment') && !lc.includes('code') && !lc.includes('reason');
        });
-  const groupCol = findCol('assignment group','assignment_group','group','team','queue');
+  const groupCol  = findCol('assignment group','assignment_group','group','team','queue');
+  const catCol    = findCol('category','cat','class');
+  const descCol   = findCol('short description','short_desc','subject','summary','title','description');
+  const prioCol   = findCol('priority','prio','urgency','severity');
+  const typeCol   = findCol('type','call type','incident type','contact type','request type');
+  const stateCol  = findCol('state','status','ticket status');
   if (!openedCol) throw new Error('Cannot find Opened column');
   console.log('[upload] cols:', cols.join(' | '));
   console.log('[upload] openedCol:', openedCol, '| resolvedCol:', resolvedCol, '| groupCol:', groupCol);
+  console.log('[upload] catCol:', catCol, '| descCol:', descCol, '| prioCol:', prioCol);
 
   const GROUP_MAP = {
     'netrio - help desk [agionow]':                   'Netrio - Help Desk [AgioNow]',
@@ -4882,13 +5105,26 @@ function parseServiceNowRows(rows) {
 
   let cntO = 0, cntR = 0;
   const newOpened = {}, newResolved = {};
+  RAW_TICKETS = []; // reset on each upload
 
   for (const row of rows) {
     const rawGroup = String(row[groupCol]||'').trim();
     const grp = GROUP_MAP[rawGroup.toLowerCase()] || rawGroup;
 
     const op = parseDT(row[openedCol]);
-    if (op) { inc(newOpened,'All',op.dateKey,op.hourKey); inc(newOpened,grp,op.dateKey,op.hourKey); cntO++; }
+    if (op) {
+      inc(newOpened,'All',op.dateKey,op.hourKey); inc(newOpened,grp,op.dateKey,op.hourKey); cntO++;
+      RAW_TICKETS.push({
+        date:     op.dateKey,
+        hour:     parseInt(op.hourKey),
+        group:    grp,
+        category: catCol   ? String(row[catCol]  ||'').trim() : '',
+        shortDesc:descCol  ? String(row[descCol] ||'').trim() : '',
+        priority: prioCol  ? String(row[prioCol] ||'').trim() : '',
+        type:     typeCol  ? String(row[typeCol]  ||'').trim() : '',
+        state:    stateCol ? String(row[stateCol]||'').trim() : '',
+      });
+    }
 
     if (resolvedCol) {
       const rv = parseDT(row[resolvedCol]);

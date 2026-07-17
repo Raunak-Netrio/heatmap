@@ -3600,11 +3600,17 @@ async function _sha256(str) {
 }
 
 async function _fetchAllowlist() {
+  // Use GitHub API (not raw CDN) to avoid stale cache after admin updates
   try {
-    const res = await fetch(ALLOWLIST_URL + '?t=' + Date.now());
-    return res.ok ? res.json() : null;
+    const api = 'https://api.github.com/repos/Raunak-Netrio/heatmap/contents/allowlist.json';
+    const res = await fetch(api, { headers: { Accept: 'application/vnd.github.v3+json' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return JSON.parse(atob(data.content.replace(/\n/g, '')));
   } catch { return null; }
 }
+
+function _authErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
 
 async function initAuth() {
   const sess = JSON.parse(sessionStorage.getItem(AUTH_SESS_KEY) || 'null');
@@ -3627,13 +3633,13 @@ async function authSignIn() {
   const ldEl  = document.getElementById('auth-loading');
   const btn   = document.getElementById('auth-signin-btn');
   errEl.style.display = 'none';
-  if (!email || !email.includes('@')) { errEl.textContent = 'Enter a valid email address.'; errEl.style.display = ''; return; }
-  if (!pw) { errEl.textContent = 'Enter your password.'; errEl.style.display = ''; return; }
-  btn.disabled = true; ldEl.style.display = '';
+  if (!email || !email.includes('@')) { _authErr(errEl, 'Enter a valid email address.'); return; }
+  if (!pw) { _authErr(errEl, 'Enter your password.'); return; }
+  btn.disabled = true; ldEl.style.display = 'block';
   const al = await _fetchAllowlist();
-  if (!al) { errEl.textContent = 'Could not reach access list — try again.'; errEl.style.display = ''; btn.disabled = false; ldEl.style.display = 'none'; return; }
+  if (!al) { _authErr(errEl, 'Could not reach access list — try again.'); btn.disabled = false; ldEl.style.display = 'none'; return; }
   const user = (al.users || []).find(u => u.email === email);
-  if (!user) { errEl.textContent = 'Access denied — contact your administrator.'; errEl.style.display = ''; btn.disabled = false; ldEl.style.display = 'none'; return; }
+  if (!user) { _authErr(errEl, 'Access denied — contact your administrator.'); btn.disabled = false; ldEl.style.display = 'none'; return; }
   const hash = await _sha256(pw);
   // Check locally-stored personal password first
   const local = JSON.parse(localStorage.getItem(AUTH_PW_PREFIX + email) || 'null');
@@ -3647,7 +3653,7 @@ async function authSignIn() {
     btn.disabled = false; ldEl.style.display = 'none';
     _showChangePanel(email, user.version); return;
   }
-  errEl.textContent = 'Incorrect password.'; errEl.style.display = '';
+  _authErr(errEl, 'Incorrect password.');
   btn.disabled = false; ldEl.style.display = 'none';
 }
 
@@ -3664,8 +3670,8 @@ async function authSetPassword() {
   const pw2   = document.getElementById('auth-confirm-pass').value;
   const errEl = document.getElementById('auth-change-error');
   errEl.style.display = 'none';
-  if (pw1.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = ''; return; }
-  if (pw1 !== pw2)    { errEl.textContent = 'Passwords do not match.'; errEl.style.display = ''; return; }
+  if (pw1.length < 8) { _authErr(errEl, 'Password must be at least 8 characters.'); return; }
+  if (pw1 !== pw2)    { _authErr(errEl, 'Passwords do not match.'); return; }
   const hash = await _sha256(pw1);
   localStorage.setItem(AUTH_PW_PREFIX + _cpEmail, JSON.stringify({ hash, version: _cpVersion }));
   sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email: _cpEmail }));

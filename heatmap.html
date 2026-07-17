@@ -542,6 +542,20 @@ body.dark .cd-title { color:#E0E8E8; }
 body.dark .cdkpi { background:#272B2C; }
 body.dark .cdkpi-val { color:#F47629; }
 body.dark .cdkpi-lbl { color:#8A9898; }
+.cdt-wrap { margin-top:12px; border-top:1px solid #dce1e9; padding-top:8px; }
+.cdt-hdr { font-size:10px; font-weight:700; color:#6b7a8d; text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.cdt-row { display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; padding:5px 0; border-bottom:1px solid #f0f2f5; font-size:11px; }
+.cdt-row:last-child { border-bottom:none; }
+.cdt-num  { font-weight:700; color:#E06820; min-width:90px; font-family:monospace; }
+.cdt-grp  { color:#4a7090; font-size:10px; background:#edf3f8; border-radius:4px; padding:1px 6px; }
+.cdt-desc { color:#2B3032; flex:1; min-width:150px; }
+.cdt-state{ color:#6b7a8d; font-size:10px; font-style:italic; }
+body.dark .cdt-wrap { border-top-color:#2C3032; }
+body.dark .cdt-row { border-bottom-color:#2C3032; }
+body.dark .cdt-num  { color:#F47629; }
+body.dark .cdt-grp  { color:#8AC8C8; background:#1A2C2C; }
+body.dark .cdt-desc { color:#C8D0D0; }
+body.dark .cdt-state{ color:#8A9898; }
 
 /* OR Map / Res-rate map heatmap colours */
 td.heat.orm-green { background:#2ecc71; color:#fff; }
@@ -3053,6 +3067,16 @@ function showCellDetail(dateKey, hour, label, day) {
   const orColor = orV === null ? '#6b7a8d' : orV >= 1 ? '#e74c3c' : orV >= 0.7 ? '#FBA832' : '#2ecc71';
   const kpi = (val, lbl, color) =>
     `<div class="cdkpi"><div class="cdkpi-val" style="${color?'color:'+color:''}">${val}</div><div class="cdkpi-lbl">${lbl}</div></div>`;
+  // Tickets opened in this cell (match by date + hourKey)
+  const cellTickets = RAW_TICKETS.filter(t => t.date === dateKey && t.hour === hour);
+  const ticketRows = cellTickets.length ? cellTickets.map(t => {
+    const num  = t.num       ? `<span class="cdt-num">${t.num}</span>` : '';
+    const grp  = t.group     ? `<span class="cdt-grp">${t.group}</span>` : '';
+    const desc = t.shortDesc ? `<span class="cdt-desc">${t.shortDesc}</span>` : '';
+    const st   = t.state     ? `<span class="cdt-state">${t.state}</span>` : '';
+    return `<div class="cdt-row">${num}${grp}${desc}${st}</div>`;
+  }).join('') : '';
+
   const html = `
     <div class="cd-title">
       <span>📍 ${label} &middot; ${day} &middot; ${tzDisp(hour)}</span>
@@ -3064,7 +3088,8 @@ function showCellDetail(dateKey, hour, label, day) {
       ${kpi(rrPct !== null ? rrPct + '%' : '—', 'Resolution Rate')}
       ${kpi(orV !== null ? orV.toFixed(2) : '—', 'Occupancy Ratio', orColor)}
       ${kpi(av, 'Staff Slots')}
-    </div>`;
+    </div>
+    ${ticketRows ? `<div class="cdt-wrap"><div class="cdt-hdr">Opened cases (${cellTickets.length})</div>${ticketRows}</div>` : ''}`;
   document.getElementById('cell-detail').innerHTML = html;
   const wrap = document.getElementById('cell-detail-wrap');
   wrap.style.display = '';
@@ -3146,14 +3171,15 @@ function parseServiceNowRows(rows) {
        });
   const groupCol  = findCol('assignment group','assignment_group','group','team','queue');
   const catCol    = findCol('category','cat','class');
-  const descCol   = findCol('short description','short_desc','subject','summary','title','description','case');
+  const descCol   = findCol('short description','short_desc','subject','summary','title','description');
   const prioCol   = findCol('priority','prio','urgency','severity');
   const typeCol   = findCol('type','call type','incident type','contact type','request type');
   const stateCol  = findCol('state','status','ticket status');
+  const numCol    = findCol('number','case number','case_number','ticket number','ticket_number','case no','ticket no','case id','ticket id');
   if (!openedCol) throw new Error('Cannot find Opened column');
   console.log('[upload] cols:', cols.join(' | '));
   console.log('[upload] openedCol:', openedCol, '| resolvedCol:', resolvedCol, '| groupCol:', groupCol);
-  console.log('[upload] catCol:', catCol, '| descCol:', descCol, '| prioCol:', prioCol);
+  console.log('[upload] catCol:', catCol, '| descCol:', descCol, '| numCol:', numCol);
 
   const GROUP_MAP = {
     'netrio - help desk [agionow]':                   'Netrio - Help Desk [AgioNow]',
@@ -3209,6 +3235,7 @@ function parseServiceNowRows(rows) {
         date:     op.dateKey,
         hour:     parseInt(op.hourKey),
         group:    grp,
+        num:      numCol   ? String(row[numCol]   || '').trim() : '',
         category: catCol ? String(row[catCol] || '').trim() : classifyDesc(_rawDesc, grp),
         shortDesc: _rawDesc,
         priority: prioCol  ? String(row[prioCol] ||'').trim() : '',

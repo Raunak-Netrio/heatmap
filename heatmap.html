@@ -550,11 +550,42 @@ td.heat.orm-red   { background:#e74c3c; color:#fff; }
 td.heat.rrm-low   { background:#EBF4F5; }
 td.heat.rrm-mid   { background:#5A9DA8; color:#fff; }
 td.heat.rrm-high  { background:#0D4048; color:#fff; }
+/* ── Auth overlay ──────────────────────────────────────────────────────── */
+#auth-overlay{position:fixed;inset:0;z-index:99999;background:rgba(10,14,16,.97);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#auth-card{background:#1A1F21;border:1px solid #2C3538;border-radius:14px;padding:38px 42px;width:340px;max-width:92vw;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.75)}
+#auth-logo{height:32px;margin-bottom:20px;background:#fff;border-radius:5px;padding:3px 12px}
+#auth-title{font-size:16px;font-weight:700;color:#DDE8E8;margin-bottom:6px}
+#auth-sub{font-size:12px;color:#607070;margin-bottom:26px;line-height:1.6}
+#auth-ms-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 18px;border:none;border-radius:8px;background:#0078D4;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s}
+#auth-ms-btn:hover{background:#106EBE}
+#auth-ms-btn:disabled{opacity:.55;cursor:default}
+#auth-error{margin-top:13px;font-size:11.5px;color:#f87171;display:none;line-height:1.5}
+#auth-loading{margin-top:13px;font-size:11.5px;color:#607070;display:none}
+#auth-user-pill{display:none;align-items:center;gap:8px;font-size:11.5px;color:#8AABAB}
+#auth-user-name{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#auth-signout-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#7A9494;border-radius:5px;padding:0 9px;height:24px;cursor:pointer;font-size:11px;font-family:inherit;line-height:24px}
+#auth-signout-btn:hover{color:#fff;background:rgba(255,255,255,.13)}
+body.dark #auth-card{background:#12191C;border-color:#263033}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 </head>
 <body>
+
+<div id="auth-overlay">
+  <div id="auth-card">
+    <img id="auth-logo" src="netrio-logo.png" alt="Netrio">
+    <div id="auth-title">Cases Heatmap</div>
+    <div id="auth-sub">Restricted to <strong style="color:#E06820">@netrio.com</strong> accounts.<br>Sign in with your Netrio Microsoft account.</div>
+    <button id="auth-ms-btn" onclick="authSignIn()">
+      <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div id="auth-error"></div>
+    <div id="auth-loading">Signing in…</div>
+  </div>
+</div>
 
 <div id="modal" onclick="if(event.target===this)closeModal()">
   <div id="modalBox">
@@ -570,6 +601,10 @@ td.heat.rrm-high  { background:#0D4048; color:#fff; }
     </div>
   </div>
   <div class="header-right">
+    <div id="auth-user-pill">
+      <span id="auth-user-name"></span>
+      <button id="auth-signout-btn" onclick="authSignOut()">Sign out</button>
+    </div>
     <button id="darkToggle" onclick="toggleDark()">🌙 Dark</button>
   </div>
 </div>
@@ -3539,6 +3574,82 @@ applyDark();
 
 restoreUploads();
 render();
+
+// ── Microsoft Authentication ────────────────────────────────────────────
+const AUTH_CLIENT_ID = 'REPLACE_WITH_YOUR_AZURE_APP_CLIENT_ID';
+const AUTH_DOMAIN    = 'netrio.com';
+let _msal = null;
+
+async function initAuth() {
+  const overlay = document.getElementById('auth-overlay');
+  if (!window.msal || AUTH_CLIENT_ID === 'REPLACE_WITH_YOUR_AZURE_APP_CLIENT_ID') {
+    overlay.style.display = 'none'; // skip auth if not configured
+    return;
+  }
+  _msal = new msal.PublicClientApplication({
+    auth: {
+      clientId: AUTH_CLIENT_ID,
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: window.location.origin + window.location.pathname,
+    },
+    cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+  });
+  await _msal.initialize();
+  const resp = await _msal.handleRedirectPromise().catch(() => null);
+  if (resp) { _authHandle(resp); return; }
+  const accounts = _msal.getAllAccounts();
+  if (accounts.length && _authOk(accounts[0].username)) { _authShow(accounts[0]); return; }
+  overlay.style.display = 'flex';
+}
+
+function _authOk(email) { return (email || '').toLowerCase().endsWith('@' + AUTH_DOMAIN); }
+
+async function authSignIn() {
+  const btn = document.getElementById('auth-ms-btn');
+  const errEl = document.getElementById('auth-error');
+  const ldEl  = document.getElementById('auth-loading');
+  btn.disabled = true; errEl.style.display = 'none'; ldEl.style.display = '';
+  try {
+    const result = await _msal.loginPopup({ scopes: ['openid','profile','email'] });
+    _authHandle(result);
+  } catch(e) {
+    errEl.textContent = e.errorCode === 'user_cancelled'
+      ? 'Sign-in cancelled.'
+      : 'Sign-in failed: ' + (e.message || e);
+    errEl.style.display = '';
+  }
+  btn.disabled = false; ldEl.style.display = 'none';
+}
+
+function _authHandle(result) {
+  if (!_authOk(result.account.username)) {
+    if (_msal) _msal.logoutPopup({ account: result.account }).catch(()=>{});
+    const errEl = document.getElementById('auth-error');
+    errEl.textContent = 'Access denied — only @' + AUTH_DOMAIN + ' accounts are permitted.';
+    errEl.style.display = '';
+    return;
+  }
+  _authShow(result.account);
+}
+
+function _authShow(acct) {
+  document.getElementById('auth-overlay').style.display = 'none';
+  const pill = document.getElementById('auth-user-pill');
+  const nameEl = document.getElementById('auth-user-name');
+  nameEl.textContent = acct.name || acct.username;
+  nameEl.title = acct.username;
+  pill.style.display = 'flex';
+}
+
+function authSignOut() {
+  (_msal ? _msal.logoutPopup() : Promise.reject()).then(() => {
+    document.getElementById('auth-user-pill').style.display = 'none';
+    document.getElementById('auth-error').style.display = 'none';
+    document.getElementById('auth-overlay').style.display = 'flex';
+  }).catch(() => location.reload());
+}
+
+initAuth();
 </script>
 </body>
 </html>

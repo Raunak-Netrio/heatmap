@@ -3600,14 +3600,27 @@ async function _sha256(str) {
 }
 
 async function _fetchAllowlist() {
-  // Use GitHub API (not raw CDN) to avoid stale cache after admin updates
+  // Try GitHub API first (no CDN cache); fall back to raw URL if rate-limited
+  const api = 'https://api.github.com/repos/Raunak-Netrio/heatmap/contents/allowlist.json';
+  const raw = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';
   try {
-    const api = 'https://api.github.com/repos/Raunak-Netrio/heatmap/contents/allowlist.json';
     const res = await fetch(api, { headers: { Accept: 'application/vnd.github.v3+json' } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return JSON.parse(atob(data.content.replace(/\n/g, '')));
-  } catch { return null; }
+    if (res.ok) {
+      const data = await res.json();
+      return JSON.parse(atob(data.content.replace(/[\r\n]/g, '')));
+    }
+    if (res.status === 403 || res.status === 429) {
+      // Rate limited — fall back to raw URL
+      const r2 = await fetch(raw + '?t=' + Date.now());
+      return r2.ok ? r2.json() : null;
+    }
+    return null;
+  } catch {
+    try {
+      const r2 = await fetch(raw + '?t=' + Date.now());
+      return r2.ok ? r2.json() : null;
+    } catch { return null; }
+  }
 }
 
 function _authErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }

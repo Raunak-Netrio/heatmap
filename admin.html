@@ -240,7 +240,7 @@ async function unlockAdmin() {
 
 function openAdmin() {
   document.getElementById('gate-panel').style.display = 'none';
-  document.getElementById('admin-panel').style.display = '';
+  document.getElementById('admin-panel').style.display = 'block';
   if (ghToken) {
     document.getElementById('gh-token').value = ghToken;
     loadAllowlist();

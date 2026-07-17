@@ -3621,7 +3621,7 @@ async function authSignIn() {
   btn.disabled = false; ldEl.style.display = 'none';
 }
 
-function _authHandle(result) {
+async function _authHandle(result) {
   if (!_authOk(result.account.username)) {
     if (_msal) _msal.logoutPopup({ account: result.account }).catch(()=>{});
     const errEl = document.getElementById('auth-error');
@@ -3629,10 +3629,35 @@ function _authHandle(result) {
     errEl.style.display = '';
     return;
   }
-  _authShow(result.account);
+  await _authShow(result.account);
 }
 
-function _authShow(acct) {
+const ALLOWLIST_URL = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';
+
+async function _checkAllowlist(email) {
+  const em = (email || '').toLowerCase();
+  try {
+    const res = await fetch(ALLOWLIST_URL + '?t=' + Date.now());
+    if (!res.ok) return _authOk(em);
+    const al = await res.json();
+    const m  = al.mode || 'domain';
+    const list = (al.emails || []).map(e => e.toLowerCase());
+    if (m === 'domain')    return _authOk(em);
+    if (m === 'allowlist') return list.includes(em);
+    if (m === 'both')      return _authOk(em) || list.includes(em);
+    return _authOk(em);
+  } catch { return _authOk(em); }
+}
+
+async function _authShow(acct) {
+  const allowed = await _checkAllowlist(acct.username);
+  if (!allowed) {
+    if (_msal) _msal.logoutPopup({ account: acct }).catch(()=>{});
+    const errEl = document.getElementById('auth-error');
+    errEl.textContent = 'Access denied — your account is not on the access list. Contact your administrator.';
+    errEl.style.display = '';
+    return;
+  }
   document.getElementById('auth-overlay').style.display = 'none';
   const pill = document.getElementById('auth-user-pill');
   const nameEl = document.getElementById('auth-user-name');

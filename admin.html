@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heatmap — Access Control Admin</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0C1214; color: #C8D8D8; min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.card {
+  background: #1A2124; border: 1px solid #2A3538; border-radius: 14px;
+  padding: 36px 40px; width: 540px; max-width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.65);
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.brand img { height: 26px; background: #fff; border-radius: 5px; padding: 3px 10px; }
+.brand-title { font-size: 17px; font-weight: 700; color: #E0EAEA; }
+.brand-sub { font-size: 11px; color: #5A7070; margin-top: 1px; }
+
+label {
+  display: block; font-size: 11px; color: #6A9090; margin-bottom: 5px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+}
+input[type="text"], input[type="password"], input[type="email"] {
+  width: 100%; background: #111A1E; border: 1px solid #2C3C3E; border-radius: 7px;
+  color: #C8D8D8; font-size: 13px; font-family: inherit; padding: 9px 12px;
+  outline: none; transition: border-color .15s;
+}
+input:focus { border-color: #E06820; }
+
+.row { display: flex; gap: 8px; align-items: flex-end; }
+.row input { flex: 1; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 20px; background: #E06820; color: #fff; border: none;
+  border-radius: 7px; font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background .15s; white-space: nowrap;
+}
+.btn-primary:hover { background: #C55810; }
+.btn-primary:disabled { opacity: .5; cursor: default; }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; padding: 9px 16px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  color: #8AACAC; border-radius: 7px; font-size: 12.5px; font-family: inherit;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn-ghost:hover { color: #fff; background: rgba(255,255,255,.12); }
+
+.btn-remove {
+  padding: 4px 10px; background: rgba(220,60,60,.1); border: 1px solid rgba(220,60,60,.22);
+  color: #f87171; border-radius: 5px; font-size: 11.5px; font-family: inherit; cursor: pointer;
+  transition: background .15s;
+}
+.btn-remove:hover { background: rgba(220,60,60,.22); }
+
+.sep { height: 1px; background: #1C2C30; margin: 24px 0; }
+
+.error-txt { font-size: 12px; color: #f87171; margin-top: 8px; display: none; }
+.ok-txt    { font-size: 12px; color: #4ade80; margin-top: 8px; display: none; }
+.info-txt  { font-size: 12px; color: #5A8080; margin-top: 6px; display: none; }
+
+.section-title { font-size: 12.5px; font-weight: 700; color: #8AACAC; margin-bottom: 12px; letter-spacing: .3px; }
+
+/* Mode chips */
+.mode-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.mode-chip {
+  display: flex; align-items: center; gap: 6px; padding: 7px 14px;
+  background: #111C20; border: 1.5px solid #2C3C3E; border-radius: 20px;
+  cursor: pointer; font-size: 12px; color: #7AACAC; transition: all .15s;
+  user-select: none;
+}
+.mode-chip.active { border-color: #E06820; color: #E06820; background: rgba(224,104,32,.1); }
+.mode-chip span { font-size: 11px; pointer-events: none; }
+
+/* Email list */
+.email-list { margin: 10px 0; }
+.email-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; background: #111C20; border: 1px solid #1E2E30;
+  border-radius: 7px; margin-bottom: 6px;
+}
+.email-addr { font-size: 12.5px; font-family: monospace; color: #C0D0D0; }
+.empty-note { font-size: 12px; color: #4A6060; font-style: italic; padding: 10px 0; }
+
+/* GitHub status */
+.gh-status { font-size: 12px; color: #5A7070; margin-top: 7px; }
+.gh-status.ok  { color: #4ade80; }
+.gh-status.err { color: #f87171; }
+
+/* Save bar */
+.save-bar { margin-top: 22px; display: flex; align-items: center; gap: 12px; }
+.save-note { font-size: 12px; }
+
+/* Spinner */
+.spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#admin-panel { display: none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <img src="netrio-logo.png" alt="Netrio">
+    <div>
+      <div class="brand-title">Access Control Admin</div>
+      <div class="brand-sub">Manage who can access the Cases Heatmap</div>
+    </div>
+  </div>
+
+  <!-- ── Password gate ─────────────────────────────────────────────── -->
+  <div id="gate-panel">
+    <label for="admin-pass" id="gate-label">Admin Password</label>
+    <input type="password" id="admin-pass" placeholder="Enter admin password" autocomplete="current-password">
+    <div id="first-hint" class="info-txt">First time? This password will be saved for future access.</div>
+    <div id="gate-error" class="error-txt"></div>
+    <div style="margin-top:14px"><button class="btn-primary" onclick="unlockAdmin()">Unlock</button></div>
+  </div>
+
+  <!-- ── Admin panel ───────────────────────────────────────────────── -->
+  <div id="admin-panel">
+
+    <!-- GitHub connection -->
+    <div class="section-title">GitHub Connection</div>
+    <label for="gh-token">Personal Access Token (needs <code style="font-size:11px;color:#E06820">contents:write</code> on this repo)</label>
+    <div class="row">
+      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <button class="btn-ghost" onclick="connectGitHub()">Connect</button>
+    </div>
+    <div id="gh-status" class="gh-status"></div>
+
+    <div class="sep"></div>
+
+    <!-- Access mode -->
+    <div class="section-title">Access Mode</div>
+    <div class="mode-wrap" id="mode-wrap">
+      <div class="mode-chip" data-mode="domain" onclick="setMode('domain')">
+        <span>🏢</span> @netrio.com (everyone)
+      </div>
+      <div class="mode-chip" data-mode="allowlist" onclick="setMode('allowlist')">
+        <span>📋</span> Listed emails only
+      </div>
+      <div class="mode-chip" data-mode="both" onclick="setMode('both')">
+        <span>✚</span> Domain + specific emails
+      </div>
+    </div>
+
+    <!-- Email allowlist -->
+    <div class="section-title">Allowed Emails</div>
+    <div id="email-list" class="email-list">
+      <div class="empty-note">No specific emails added yet.</div>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <input type="email" id="new-email" placeholder="someone@example.com">
+      <button class="btn-ghost" onclick="addEmail()">Add</button>
+    </div>
+    <div id="add-error" class="error-txt"></div>
+
+    <div class="sep"></div>
+
+    <!-- Save -->
+    <div class="save-bar">
+      <button class="btn-primary" id="save-btn" onclick="saveAllowlist()">Save to GitHub</button>
+      <span id="save-note" class="save-note"></span>
+    </div>
+    <div id="save-error" class="error-txt"></div>
+
+    <div class="sep"></div>
+
+    <!-- Change password -->
+    <details style="font-size:12px;color:#5A7070;cursor:pointer">
+      <summary style="outline:none">Change admin password</summary>
+      <div style="margin-top:12px">
+        <label for="new-pass">New Password</label>
+        <div class="row">
+          <input type="password" id="new-pass" placeholder="New password">
+          <button class="btn-ghost" onclick="changePassword()">Update</button>
+        </div>
+        <div id="pass-ok" class="ok-txt">Password updated.</div>
+        <div id="pass-err" class="error-txt"></div>
+      </div>
+    </details>
+
+  </div>
+</div>
+
+<script>
+const REPO_OWNER   = 'Raunak-Netrio';
+const REPO_NAME    = 'heatmap';
+const REPO_BRANCH  = 'master';
+const ALLOWLIST_FILE = 'allowlist.json';
+const PASS_KEY = 'hm_admin_hash_v1';
+
+let ghToken = sessionStorage.getItem('hm_admin_pat') || '';
+let allowlistSha = '';
+let emails = [];
+let mode = 'domain';
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function show(el, msg, cls) {
+  el.textContent = msg;
+  el.className = cls || el.className;
+  el.style.display = msg ? '' : 'none';
+}
+
+// ── Password gate ─────────────────────────────────────────────────────────
+const stored = localStorage.getItem(PASS_KEY);
+if (!stored) {
+  document.getElementById('gate-label').textContent = 'Create Admin Password';
+  document.getElementById('first-hint').style.display = '';
+}
+document.getElementById('admin-pass').addEventListener('keydown', e => { if (e.key === 'Enter') unlockAdmin(); });
+
+async function unlockAdmin() {
+  const pass = document.getElementById('admin-pass').value;
+  if (!pass) return;
+  const hash = await sha256(pass);
+  const saved = localStorage.getItem(PASS_KEY);
+  if (!saved) {
+    localStorage.setItem(PASS_KEY, hash);
+    openAdmin();
+  } else if (hash === saved) {
+    openAdmin();
+  } else {
+    show(document.getElementById('gate-error'), 'Incorrect password.');
+  }
+}
+
+function openAdmin() {
+  document.getElementById('gate-panel').style.display = 'none';
+  document.getElementById('admin-panel').style.display = '';
+  if (ghToken) {
+    document.getElementById('gh-token').value = ghToken;
+    loadAllowlist();
+  }
+}
+
+async function changePassword() {
+  const val = document.getElementById('new-pass').value;
+  const okEl = document.getElementById('pass-ok');
+  const errEl = document.getElementById('pass-err');
+  okEl.style.display = 'none'; errEl.style.display = 'none';
+  if (!val || val.length < 6) { show(errEl, 'Password must be at least 6 characters.'); return; }
+  localStorage.setItem(PASS_KEY, await sha256(val));
+  document.getElementById('new-pass').value = '';
+  show(okEl, 'Password updated.'); okEl.style.display = '';
+}
+
+// ── GitHub API ────────────────────────────────────────────────────────────
+async function connectGitHub() {
+  const tok = document.getElementById('gh-token').value.trim();
+  if (!tok) return;
+  ghToken = tok;
+  sessionStorage.setItem('hm_admin_pat', tok);
+  await loadAllowlist();
+}
+
+async function loadAllowlist() {
+  const st = document.getElementById('gh-status');
+  st.textContent = 'Connecting…'; st.className = 'gh-status';
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${ALLOWLIST_FILE}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `token ${ghToken}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      allowlistSha = data.sha;
+      const parsed = JSON.parse(atob(data.content.replace(/\n/g, '')));
+      emails = parsed.emails || [];
+      mode   = parsed.mode  || 'domain';
+      st.textContent = '✓ Connected — allowlist loaded';
+      st.className = 'gh-status ok';
+    } else if (res.status === 404) {
+      allowlistSha = ''; emails = []; mode = 'domain';
+      st.textContent = '✓ Connected — no allowlist.json yet; will create on save';
+      st.className = 'gh-status ok';
+    } else if (res.status === 401) {
+      st.textContent = 'Invalid token — check it has repo contents:write permission';
+      st.className = 'gh-status err'; return;
+    } else {
+      st.textContent = 'Error ' + res.status; st.className = 'gh-status err'; return;
+    }
+  } catch (e) {
+    st.textContent = 'Network error: ' + e.message; st.className = 'gh-status err'; return;
+  }
+  renderAll();
+}
+
+async function saveAllowlist() {
+  if (!ghToken) { alert('Connect to GitHub first.'); return; }
+  const btn = document.getElementById('save-btn');
+  const noteEl = document.getElementById('save-note');
+  const errEl  = document.getElementById('save-error');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Saving…';
+  noteEl.textContent = ''; noteEl.style.color = '';
+  errEl.style.display = 'none';
+
+  const content = JSON.stringify({ mode, emails }, null, 2);
+  const b64 = btoa(unescape(encodeURIComponent(content)));
+  const body = {
+    message: 'Update access control allowlist',
+    content: b64,
+    branch: REPO_BRANCH,
+  };
+  if (allowlistSha) body.sha = allowlistSha;
+
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${ALLOWLIST_FILE}`;
+  try {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${ghToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      allowlistSha = data.content.sha;
+      noteEl.textContent = '✓ Saved!';
+      noteEl.style.color = '#4ade80';
+      setTimeout(() => { noteEl.textContent = ''; }, 3000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      show(errEl, 'Save failed: ' + (err.message || res.status));
+    }
+  } catch (e) {
+    show(errEl, 'Network error: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Save to GitHub';
+}
+
+// ── Mode ──────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.mode === m);
+  });
+}
+
+// ── Email list ────────────────────────────────────────────────────────────
+document.getElementById('new-email').addEventListener('keydown', e => { if (e.key === 'Enter') addEmail(); });
+
+function addEmail() {
+  const input  = document.getElementById('new-email');
+  const errEl  = document.getElementById('add-error');
+  const email  = input.value.trim().toLowerCase();
+  errEl.style.display = 'none';
+  if (!email) return;
+  if (!email.includes('@') || !email.includes('.')) {
+    show(errEl, 'Enter a valid email address.'); return;
+  }
+  if (emails.includes(email)) {
+    show(errEl, 'This email is already in the list.'); return;
+  }
+  emails.push(email);
+  renderEmailList();
+  input.value = '';
+}
+
+function removeEmail(email) {
+  emails = emails.filter(e => e !== email);
+  renderEmailList();
+}
+
+function renderEmailList() {
+  const el = document.getElementById('email-list');
+  if (!emails.length) {
+    el.innerHTML = '<div class="empty-note">No specific emails added yet.</div>';
+    return;
+  }
+  el.innerHTML = emails.map(e => `
+    <div class="email-row">
+      <span class="email-addr">${e}</span>
+      <button class="btn-remove" onclick="removeEmail('${e}')">Remove</button>
+    </div>`).join('');
+}
+
+function renderAll() {
+  setMode(mode);
+  renderEmailList();
+}
+</script>
+</body>
+</html>

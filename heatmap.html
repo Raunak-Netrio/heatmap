@@ -3641,6 +3641,7 @@ render();
 const ALLOWLIST_URL   = 'https://raw.githubusercontent.com/Raunak-Netrio/heatmap/master/allowlist.json';
 const AUTH_SESS_KEY   = 'hm_auth_v2';
 const AUTH_PW_PREFIX  = 'hm_pw_v2_';
+let _logToken = '';
 
 async function _sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -3699,6 +3700,7 @@ async function authSignIn() {
   btn.disabled = true; ldEl.style.display = 'block';
   const al = await _fetchAllowlist();
   if (!al) { _authErr(errEl, 'Could not reach access list — try again.'); btn.disabled = false; ldEl.style.display = 'none'; return; }
+  _logToken = al.logToken || '';
   const user = (al.users || []).find(u => u.email === email);
   if (!user) { _authErr(errEl, 'Access denied — contact your administrator.'); btn.disabled = false; ldEl.style.display = 'none'; return; }
   const hash = await _sha256(pw);
@@ -3707,6 +3709,7 @@ async function authSignIn() {
   if (local?.version === user.version && hash === local.hash) {
     sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email }));
     btn.disabled = false; ldEl.style.display = 'none';
+    _logAccess(email);
     _showApp(email); return;
   }
   // Check temp password
@@ -3736,6 +3739,7 @@ async function authSetPassword() {
   const hash = await _sha256(pw1);
   localStorage.setItem(AUTH_PW_PREFIX + _cpEmail, JSON.stringify({ hash, version: _cpVersion }));
   sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email: _cpEmail }));
+  _logAccess(_cpEmail);
   _showApp(_cpEmail);
 }
 
@@ -3744,6 +3748,28 @@ function _showApp(email) {
   document.getElementById('auth-user-name').textContent = email;
   document.getElementById('auth-user-name').title = email;
   document.getElementById('auth-user-pill').style.display = 'flex';
+}
+
+async function _logAccess(email) {
+  if (!_logToken) return;
+  try {
+    const api = 'https://api.github.com/repos/Raunak-Netrio/heatmap/contents/access_log.json';
+    const hdrs = { Authorization: `token ${_logToken}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+    let entries = [], sha = '';
+    const r = await fetch(api, { headers: hdrs });
+    if (r.ok) {
+      const d = await r.json();
+      sha = d.sha;
+      try { entries = JSON.parse(atob(d.content.replace(/\n/g, ''))).entries || []; } catch {}
+    }
+    const cut = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    entries = entries.filter(e => e.ts > cut);
+    entries.push({ email, ts: Date.now() });
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify({ entries }, null, 2))));
+    const body = { message: 'Log access', content: b64, branch: 'master' };
+    if (sha) body.sha = sha;
+    await fetch(api, { method: 'PUT', headers: hdrs, body: JSON.stringify(body) });
+  } catch {}
 }
 
 function authSignOut() {

@@ -491,6 +491,25 @@ body.dark .qa-trend-stab { background:#272B2C; color:#8A9898; }
 body.dark .qa-trend-new  { background:#0A1E12; color:#4ade80; }
 body.dark .qa-driver-tag { background:#3A1010; color:#f87171; }
 
+/* Expand rows */
+.qa-cat-row { cursor:pointer; }
+.qa-cat-row:hover td { background:rgba(90,157,168,.06) !important; }
+.qa-tog { font-size:8px; color:#9aabb8; margin-right:7px; display:inline-block; transition:transform .18s; }
+.qa-exp-row { display:none; }
+.qa-exp-row td { padding:0 !important; border-bottom:2px solid #dce1e9; }
+.qa-exp-panel { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+.qa-exp-section { padding:12px 14px; border-right:1px solid #e8ecf0; }
+.qa-exp-section:last-child { border-right:none; }
+.qa-exp-title { font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:#6b7a8d; margin-bottom:8px; }
+.qa-sub-row { display:flex; align-items:center; gap:6px; padding:3px 0; font-size:11px; color:#2B3032; }
+.qa-sub-kw { flex:1; text-transform:capitalize; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.qa-sub-n { font-weight:700; color:#E06820; min-width:26px; text-align:right; flex-shrink:0; }
+body.dark .qa-exp-row td { border-bottom-color:#2C3032; }
+body.dark .qa-exp-section { background:#1A1E20; border-right-color:#2C3032; }
+body.dark .qa-exp-title { color:#8A9898; }
+body.dark .qa-sub-row { color:#C8D0D0; }
+body.dark .qa-sub-n { color:#F47629; }
+
 /* Staffing change plan */
 .rec-plan-summary { display:flex; gap:20px; flex-wrap:wrap; background:#f4f7fb; border-radius:8px; padding:12px 14px; margin-bottom:12px; }
 .rec-plan-kpi-val { font-size:18px; font-weight:700; color:#E06820; }
@@ -1194,6 +1213,16 @@ function setTimezone(val) {
 const INS_STATE = { tips: {}, metas: {}, showDetail: null };
 let _insEventsReady = false;
 
+// ── Queue Analysis expand/collapse ───────────────────────────────────────
+window.qaToggle = function(id) {
+  const row = document.getElementById('qa-exp-' + id);
+  const tog = document.getElementById('qa-tog-' + id);
+  if (!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : '';
+  if (tog) tog.style.transform = open ? '' : 'rotate(90deg)';
+};
+
 // ── Recommendations interactivity state ──────────────────────────────────
 const REC_STATE = { tips: {}, metas: {}, showDetail: null };
 let _recEventsReady = false;
@@ -1735,8 +1764,8 @@ function renderInsights() {
       `<div class="qa-driver-card"><div class="qa-driver-name">${c.name}</div><div class="qa-driver-stats"><span class="qa-stat"><strong>${c.count}</strong> tickets</span><span class="qa-stat qa-hot"><strong>${(c.ocPct*100).toFixed(0)}%</strong> in over-cap hrs</span><span class="qa-stat"><strong>${(c.pct*100).toFixed(0)}%</strong> of total</span>${c.topHr ? `<span class="qa-stat">Peak: <strong>${tzHourLabel(c.topHr)}</strong></span>` : ''}<span class="qa-stat qa-trend">${c.trend}</span></div></div>`
     ).join('');
 
-    const maxCatCount  = qaCatList[0]?.count || 1;
-    const qaDriverSet  = new Set(qaDrivers.map(d => d.name));
+    const maxCatCount = qaCatList[0]?.count || 1;
+    const qaDriverSet = new Set(qaDrivers.map(d => d.name));
     const trendChip = t =>
       t === '▲ Rising'  ? `<span class="qa-trend-chip qa-trend-up">${t}</span>`  :
       t === '▼ Falling' ? `<span class="qa-trend-chip qa-trend-down">${t}</span>` :
@@ -1744,21 +1773,86 @@ function renderInsights() {
                           `<span class="qa-trend-chip qa-trend-stab">${t}</span>`;
     const ocColor = p => p >= 0.6 ? '#e74c3c' : p >= 0.4 ? '#E06820' : p > 0 ? '#5A9DA8' : '#8A9898';
     const bar = (pct, color) =>
-      `<span class="qa-bar-wrap"><span class="qa-bar-fill" style="width:${pct.toFixed(0)}%;background:${color}"></span></span>`;
+      `<span class="qa-bar-wrap"><span class="qa-bar-fill" style="width:${Math.min(pct,100).toFixed(0)}%;background:${color}"></span></span>`;
+
+    const QA_STOP = new Set(['the','and','for','with','not','are','has','can','its','was','all','but','been','have','this','that','from','will','when','then','they','their','also','more','into','some','your','case','issue','issues','request','requests','problem','ticket','urgent','follow','update','user','using','help','please','dear','thank','hello','hi','new','re']);
+    function qaSubData(catName) {
+      const tix = qaTickets.filter(t => t.category === catName);
+      const freq = {};
+      tix.forEach(t => {
+        const raw = (t.shortDesc || '').replace(/CS\d+/gi,'').replace(/^[^-]+-\s*/,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ');
+        raw.split(/\s+/).forEach(w => { if (w.length >= 4 && !QA_STOP.has(w)) freq[w] = (freq[w]||0)+1; });
+      });
+      const topWords = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8).filter(([,n])=>n>=2);
+      const subG = Object.fromEntries(topWords.map(([w])=>[w,0]));
+      let other = 0;
+      tix.forEach(t => {
+        const cl = (t.shortDesc||'').toLowerCase();
+        const m = topWords.find(([w]) => cl.includes(w));
+        if (m) subG[m[0]]++; else other++;
+      });
+      const prioMap = {}, stateMap = {}, hourMap = {};
+      tix.forEach(t => {
+        const p = (t.priority||'—').replace(/^\d\s*-\s*/,'') || '—';
+        prioMap[p] = (prioMap[p]||0)+1;
+        const s = t.state || '—';
+        stateMap[s] = (stateMap[s]||0)+1;
+        hourMap[t.hour] = (hourMap[t.hour]||0)+1;
+      });
+      return {
+        subG, other, total: tix.length,
+        prioList:  Object.entries(prioMap).sort((a,b)=>b[1]-a[1]).slice(0,5),
+        stateList: Object.entries(stateMap).sort((a,b)=>b[1]-a[1]).slice(0,5),
+        hourList:  Object.entries(hourMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([h,n])=>[Number(h),n])
+      };
+    }
 
     const qaConstRows = `<table class="qa-const-table">
       <thead><tr>
         <th>Category</th><th>Tickets</th><th>Days active</th><th>% of total</th><th>Over-cap %</th><th>Trend</th><th>Top hour</th>
       </tr></thead>
-      <tbody>${qaConst.map(c => `<tr>
-        <td><strong>${c.name}</strong>${qaDriverSet.has(c.name) ? '<span class="qa-driver-tag">DRIVER</span>' : ''}</td>
-        <td>${c.count.toLocaleString()}${bar(c.count / maxCatCount * 100, '#E06820')}</td>
-        <td>${c.days} / ${activeDays} days</td>
-        <td>${(c.pct*100).toFixed(0)}%${bar(c.pct*100, '#5A9DA8')}</td>
-        <td style="color:${ocColor(c.ocPct)};font-weight:700">${(c.ocPct*100).toFixed(0)}%</td>
-        <td>${trendChip(c.trend)}</td>
-        <td>${c.topHr ? tzHourLabel(c.topHr) : '—'}</td>
-      </tr>`).join('')}</tbody>
+      <tbody>${qaConst.map(c => {
+        const sid = c.name.replace(/\W+/g,'_');
+        const sub = qaSubData(c.name);
+        const subHtml = Object.entries(sub.subG).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1])
+          .map(([k,n])=>`<div class="qa-sub-row"><span class="qa-sub-kw">${k}</span>${bar(n/sub.total*100,'#E06820')}<span class="qa-sub-n">${n}</span></div>`).join('')
+          || `<div style="color:#9aabb8;font-size:11px">No keywords extracted</div>`;
+        const prioHtml  = sub.prioList.map(([p,n])=>`<div class="qa-sub-row"><span class="qa-sub-kw">${p}</span><span class="qa-sub-n">${n}</span></div>`).join('');
+        const stateHtml = sub.stateList.map(([s,n])=>`<div class="qa-sub-row"><span class="qa-sub-kw">${s}</span><span class="qa-sub-n">${n}</span></div>`).join('');
+        const hourHtml  = sub.hourList.map(([h,n])=>`<div class="qa-sub-row"><span class="qa-sub-kw">${tzHourLabel(h)}</span><span class="qa-sub-n">${n}</span></div>`).join('');
+        return `<tr class="qa-cat-row" onclick="qaToggle('${sid}')">
+          <td><span class="qa-tog" id="qa-tog-${sid}">▶</span><strong>${c.name}</strong>${qaDriverSet.has(c.name)?'<span class="qa-driver-tag">DRIVER</span>':''}</td>
+          <td>${c.count.toLocaleString()}${bar(c.count/maxCatCount*100,'#E06820')}</td>
+          <td>${c.days} / ${activeDays} days</td>
+          <td>${(c.pct*100).toFixed(0)}%${bar(c.pct*100,'#5A9DA8')}</td>
+          <td style="color:${ocColor(c.ocPct)};font-weight:700">${(c.ocPct*100).toFixed(0)}%</td>
+          <td>${trendChip(c.trend)}</td>
+          <td>${c.topHr?tzHourLabel(c.topHr):'—'}</td>
+        </tr>
+        <tr class="qa-exp-row" id="qa-exp-${sid}">
+          <td colspan="7" style="padding:0">
+            <div class="qa-exp-panel">
+              <div class="qa-exp-section">
+                <div class="qa-exp-title">📝 Top Sub-Topics</div>
+                ${subHtml}
+                ${sub.other>0?`<div style="color:#9aabb8;font-size:10px;margin-top:5px">+${sub.other} other / unmatched</div>`:''}
+              </div>
+              <div class="qa-exp-section">
+                <div class="qa-exp-title">🎯 Priority</div>
+                ${prioHtml}
+              </div>
+              <div class="qa-exp-section">
+                <div class="qa-exp-title">📋 State</div>
+                ${stateHtml}
+              </div>
+              <div class="qa-exp-section">
+                <div class="qa-exp-title">🕐 Peak Hours</div>
+                ${hourHtml}
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
     </table>`;
 
     const qaPrioKPIs = qaPrioList.slice(0, 4).map(([p, n]) =>

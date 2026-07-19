@@ -3168,6 +3168,7 @@ function _clearAll() {
   _closeClearDlg();
   localStorage.removeItem('hm_excel');
   localStorage.removeItem('hm_tickets');
+  localStorage.setItem('hm_erased', JSON.stringify(['all']));
   location.reload();
 }
 function _clearMonth() {
@@ -3175,10 +3176,9 @@ function _clearMonth() {
   if (!ym) return;
   _closeClearDlg();
   try {
-    // Remove matching dates from hm_excel
+    const isMatch = d => d.startsWith(ym);
     const stored = JSON.parse(localStorage.getItem('hm_excel') || 'null');
     if (stored) {
-      const isMatch = d => d.startsWith(ym);
       ['opened','resolved'].forEach(type => {
         Object.values(stored[type] || {}).forEach(grpDates => {
           Object.keys(grpDates).filter(isMatch).forEach(d => delete grpDates[d]);
@@ -3187,11 +3187,14 @@ function _clearMonth() {
       stored.wipedDates = (stored.wipedDates || []).filter(d => !isMatch(d));
       localStorage.setItem('hm_excel', JSON.stringify(stored));
     }
-    // Remove matching tickets from hm_tickets
     const tickets = JSON.parse(localStorage.getItem('hm_tickets') || 'null');
     if (tickets) {
       localStorage.setItem('hm_tickets', JSON.stringify(tickets.filter(t => !t.date.startsWith(ym))));
     }
+    // Mark this month as erased so built-in data is also hidden after reload
+    const erased = JSON.parse(localStorage.getItem('hm_erased') || '[]');
+    if (!erased.includes('all') && !erased.includes(ym)) erased.push(ym);
+    localStorage.setItem('hm_erased', JSON.stringify(erased));
   } catch(e) { console.warn('clearMonth failed:', e); }
   location.reload();
 }
@@ -3409,6 +3412,14 @@ function parseServiceNowRows(rows) {
 
   // Persist ticket list so cell-detail works after page reload
   try { localStorage.setItem('hm_tickets', JSON.stringify(RAW_TICKETS)); } catch(e) {}
+
+  // Un-erase months that now have fresh uploaded data
+  try {
+    const uploadedMonths = new Set(Array.from(uploadedDates).map(d => d.slice(0, 7)));
+    const prevErased = JSON.parse(localStorage.getItem('hm_erased') || '[]');
+    const newErased = prevErased.includes('all') ? [] : prevErased.filter(ym => !uploadedMonths.has(ym));
+    localStorage.setItem('hm_erased', JSON.stringify(newErased));
+  } catch(e) {}
 
   return {opened:cntO, resolved:cntR};
 }
@@ -3761,7 +3772,6 @@ function restoreUploads() {
   try {
     const excel = JSON.parse(localStorage.getItem('hm_excel') || 'null');
     if (excel) {
-      // Replay the wipe so stale built-in data doesn't bleed back in after refresh
       (excel.wipedDates || []).forEach(d => {
         Object.keys(DATA.opened).forEach(g => { delete DATA.opened[g][d]; });
         Object.keys(DATA.resolved).forEach(g => { delete DATA.resolved[g][d]; });
@@ -3776,6 +3786,22 @@ function restoreUploads() {
       }
     }
   } catch(e) { console.warn('localStorage excel restore failed:', e); }
+
+  // Wipe erased months from built-in data (Availability is preserved)
+  try {
+    const erased = JSON.parse(localStorage.getItem('hm_erased') || '[]');
+    if (erased.length) {
+      const eraseAll = erased.includes('all');
+      ['opened', 'resolved'].forEach(type => {
+        Object.keys(DATA[type]).forEach(g => {
+          if (eraseAll) { DATA[type][g] = {}; return; }
+          Object.keys(DATA[type][g]).forEach(d => {
+            if (erased.some(ym => d.startsWith(ym))) delete DATA[type][g][d];
+          });
+        });
+      });
+    }
+  } catch(e) {}
 
   try {
     const tickets = JSON.parse(localStorage.getItem('hm_tickets') || 'null');

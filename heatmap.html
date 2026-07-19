@@ -34,15 +34,14 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 /* Filter bar */
 .filter-bar {
   background: #fff; border-bottom: 1px solid #dce1e9;
-  padding: 8px 20px;
+  padding: 6px 20px 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,.05);
   position: sticky; top: 52px; z-index: 90;
+  display: flex; flex-direction: column; gap: 6px;
 }
 .filter-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
-  scrollbar-width: none; -ms-overflow-style: none;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
-.filter-row::-webkit-scrollbar { display: none; }
 .filter-row > * { flex-shrink: 0; }
 .filter-spacer { flex: 1 1 8px; min-width: 8px; }
 .filter-label {
@@ -649,6 +648,7 @@ body.dark .tz-hdr-row .tz-hdr-label { color: #58C4C4; }
 
 
 <div class="filter-bar">
+  <!-- Row 1: view toggles -->
   <div class="filter-row">
     <span class="filter-label">View</span>
     <div class="btn-group">
@@ -661,7 +661,9 @@ body.dark .tz-hdr-row .tz-hdr-label { color: #58C4C4; }
       <button id="btnResMap" onclick="setType('res-map')">% Resolved</button>
       <button id="btnRecs" onclick="setType('recs')">💡 Recommendations</button>
     </div>
-    <div class="filter-divider"></div>
+  </div>
+  <!-- Row 2: filters + uploads -->
+  <div class="filter-row">
     <span class="filter-label">Month</span>
     <select id="monthSelect" onchange="setMonth(this.value)" style="width:110px">
       <option value="all">Entire Year</option>

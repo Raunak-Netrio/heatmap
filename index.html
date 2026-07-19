@@ -5350,10 +5350,28 @@ function parseServiceNowRows(rows) {
   const stateCol  = findCol('state','status','ticket status');
   const numCol    = cols.find(c => /^number$/i.test(c.trim()))
                  || findCol('case number','case_number','ticket number','ticket_number','case no','ticket no','case id','ticket id');
+  // "Case" column in ServiceNow exports holds "Short Description CSNNNNN" combined
+  const caseCol   = cols.find(c => /^case$/i.test(c.trim()));
   if (!openedCol) throw new Error('Cannot find Opened column');
   console.log('[upload] cols:', cols.join(' | '));
   console.log('[upload] openedCol:', openedCol, '| resolvedCol:', resolvedCol, '| groupCol:', groupCol);
-  console.log('[upload] catCol:', catCol, '| descCol:', descCol, '| prioCol:', prioCol);
+  console.log('[upload] catCol:', catCol, '| descCol:', descCol, '| numCol:', numCol, '| caseCol:', caseCol);
+
+  // Extract case number: prefer dedicated numCol, else parse CS/INC/etc from caseCol
+  function extractNum(row) {
+    if (numCol) return String(row[numCol] || '').trim();
+    if (caseCol) {
+      const m = String(row[caseCol] || '').match(/\b(CS\d+|INC\d+|CHG\d+|PRB\d+|TASK\d+|REQ\d+)\b/i);
+      return m ? m[1].toUpperCase() : '';
+    }
+    return '';
+  }
+  // Extract short description: prefer dedicated descCol, else strip case number from caseCol
+  function extractDesc(row) {
+    if (descCol) return String(row[descCol] || '').trim();
+    if (caseCol) return String(row[caseCol] || '').replace(/\b(CS|INC|CHG|PRB|TASK|REQ)\d+\b/gi, '').trim();
+    return '';
+  }
 
   const GROUP_MAP = {
     'netrio - help desk [agionow]':                   'Netrio - Help Desk [AgioNow]',
@@ -5404,12 +5422,12 @@ function parseServiceNowRows(rows) {
     const op = parseDT(row[openedCol]);
     if (op) {
       inc(newOpened,'All',op.dateKey,op.hourKey); inc(newOpened,grp,op.dateKey,op.hourKey); cntO++;
-      const _rawDesc = descCol ? String(row[descCol] || '').trim() : '';
+      const _rawDesc = extractDesc(row);
       RAW_TICKETS.push({
         date:     op.dateKey,
         hour:     parseInt(op.hourKey),
         group:    grp,
-        num:      numCol   ? String(row[numCol]   || '').trim() : '',
+        num:      extractNum(row),
         category: catCol ? String(row[catCol] || '').trim() : classifyDesc(_rawDesc, grp),
         shortDesc: _rawDesc,
         priority: prioCol  ? String(row[prioCol] ||'').trim() : '',

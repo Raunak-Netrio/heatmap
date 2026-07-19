@@ -40,7 +40,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 }
 .filter-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
+  scrollbar-width: none; -ms-overflow-style: none;
 }
+.filter-row::-webkit-scrollbar { display: none; }
 .filter-row > * { flex-shrink: 0; }
 .filter-spacer { flex: 1 1 8px; min-width: 8px; }
 .filter-label {
@@ -3203,12 +3205,18 @@ function parseServiceNowRows(rows) {
     return '';
   }
 
-  const GROUP_MAP = {
-    'netrio - help desk [agionow]':                   'Netrio - Help Desk [AgioNow]',
-    'netrio - help desk technical support [agionow]': 'Netrio - Help Desk Technical Support [AgioNow]',
-    'netrio - end user engineering [agionow]':        'Netrio - End User Engineering [AgioNow]',
-    'netrio - endpoint experience [agionow]':         'Netrio - Endpoint Experience [AgioNow]',
+  // Canonical names (bracket suffix varies between ServiceNow instances)
+  const CORE_GROUP_MAP = {
+    'netrio - help desk':                   'Netrio - Help Desk [AgioNow]',
+    'netrio - help desk technical support': 'Netrio - Help Desk Technical Support [AgioNow]',
+    'netrio - end user engineering':        'Netrio - End User Engineering [AgioNow]',
+    'netrio - endpoint experience':         'Netrio - Endpoint Experience [AgioNow]',
+    'netrio - event management (noc)':      'Netrio - Event Management (NOC)',
   };
+  function normalizeGroup(raw) {
+    const core = raw.toLowerCase().trim().replace(/\s*\[.*?\]\s*$/, '').trim();
+    return CORE_GROUP_MAP[core] || raw;
+  }
 
   function parseDT(val) {
     // Times in the file are already ET — parse as-is, no offset conversion
@@ -3247,7 +3255,7 @@ function parseServiceNowRows(rows) {
 
   for (const row of rows) {
     const rawGroup = String(row[groupCol]||'').trim();
-    const grp = GROUP_MAP[rawGroup.toLowerCase()] || rawGroup;
+    const grp = normalizeGroup(rawGroup);
 
     const op = parseDT(row[openedCol]);
     if (op) {

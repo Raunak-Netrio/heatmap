@@ -3119,9 +3119,11 @@ document.getElementById('upXlsx').addEventListener('change', function(e) {
   const reader = new FileReader();
   reader.onload = ev => {
     try {
-      const wb = XLSX.read(ev.target.result, {type:'array', cellDates:true});
+      const wb = XLSX.read(ev.target.result, {type:'array'});
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      // raw:false + dateNF forces date cells to strings ("2026-06-01 04:02:39")
+      // using the Excel serial directly — no Date object, no browser timezone shift
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false, dateNF:'YYYY-MM-DD HH:mm:ss'});
       const r = parseServiceNowRows(rows);
       setUploadState('xlsx', 'success', `✓ ${r.opened} opened · ${r.resolved} resolved`);
       render();

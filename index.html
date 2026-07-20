@@ -18,8 +18,9 @@ body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-logo-img {
-  height: 30px; width: auto; flex-shrink: 0;
-  background: #fff; border-radius: 5px; padding: 2px 8px;
+  height: 38px; width: auto; flex-shrink: 0;
+  background: #fff; border-radius: 6px; padding: 4px 10px;
+  object-fit: contain;
 }
 .brand-sub { font-size: 10.5px; color: #8A9898; }
 .header-right { display: flex; align-items: center; gap: 8px; }
@@ -592,6 +593,12 @@ body.dark #auth-card{background:#12191C;border-color:#263033}
 #tzRowIST th { top: 65px; background: #1A2829; border-bottom: 2px solid #4A7070; }
 body.dark .tz-hdr-row th { color: #B8D8D8; }
 body.dark .tz-hdr-row .tz-hdr-label { color: #58C4C4; }
+/* Last-updated meta bar */
+#data-meta-bar {
+  display: none; font-size: 10.5px; color: #607888;
+  padding: 2px 0 0; letter-spacing: 0.01em;
+}
+body.dark #data-meta-bar { color: #4A6868; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -742,6 +749,7 @@ body.dark .tz-hdr-row .tz-hdr-label { color: #58C4C4; }
     </label>
     <button id="clearDataBtn" class="upload-label" onclick="clearUploadedData()" title="Remove uploaded Excel data and revert to built-in data" style="border:none;cursor:pointer;">🗑 Clear Data</button>
   </div>
+  <div id="data-meta-bar"></div>
 </div>
 
 <div class="def-bar">
@@ -5334,6 +5342,7 @@ function _closeClearDlg() {
 }
 function _clearAll() {
   _closeClearDlg();
+  saveDataMeta('Cleared all data');
   localStorage.removeItem('hm_excel');
   localStorage.removeItem('hm_tickets');
   localStorage.setItem('hm_erased', JSON.stringify(['all']));
@@ -5343,6 +5352,7 @@ function _clearMonth() {
   const ym = document.getElementById('clearMonthSel').value;
   if (!ym) return;
   _closeClearDlg();
+  saveDataMeta(`Cleared month: ${ym}`);
   try {
     const stored = JSON.parse(localStorage.getItem('hm_excel') || 'null');
     if (stored) {
@@ -5386,6 +5396,7 @@ document.getElementById('upXlsx').addEventListener('change', function(e) {
       // using the Excel serial directly — no Date object, no browser timezone shift
       const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false, dateNF:'YYYY-MM-DD HH:mm:ss'});
       const r = parseServiceNowRows(rows);
+      saveDataMeta(`Uploaded ${r.opened} opened · ${r.resolved} resolved`);
       setUploadState('xlsx', 'success', `✓ ${r.opened} opened · ${r.resolved} resolved`);
       render();
     } catch(err) {
@@ -5985,6 +5996,31 @@ function restoreUploads() {
       }
     }
   } catch(e) { console.warn('localStorage avail restore failed:', e); }
+  renderDataMeta();
+}
+
+// ── Last-updated metadata ─────────────────────────────────────────────────
+let CURRENT_USER_EMAIL = '';
+
+function saveDataMeta(action) {
+  try {
+    localStorage.setItem('hm_meta', JSON.stringify({ email: CURRENT_USER_EMAIL || 'unknown', at: new Date().toISOString(), action }));
+  } catch(e) {}
+  renderDataMeta();
+}
+
+function renderDataMeta() {
+  const el = document.getElementById('data-meta-bar');
+  if (!el) return;
+  try {
+    const meta = JSON.parse(localStorage.getItem('hm_meta') || 'null');
+    if (!meta) { el.style.display = 'none'; return; }
+    const dt = new Date(meta.at);
+    const fmt = dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+              + ' at ' + dt.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', hour12:true});
+    el.textContent = `Last updated ${fmt} by ${meta.email} · ${meta.action}`;
+    el.style.display = 'block';
+  } catch(e) { el.style.display = 'none'; }
 }
 
 // ── Dark mode ─────────────────────────────────────────────────────────────
@@ -6048,7 +6084,14 @@ async function initAuth() {
     const user = al?.users?.find(u => u.email === sess.email);
     if (user) {
       const local = JSON.parse(localStorage.getItem(AUTH_PW_PREFIX + sess.email) || 'null');
-      if (local?.version === user.version) { _showApp(sess.email); return; }
+      if (local?.version === user.version) {
+        _logToken = al.logToken || '';
+        if (!sess.logged) {
+          sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email: sess.email, logged: true }));
+          _logAccess(sess.email);
+        }
+        _showApp(sess.email); return;
+      }
     }
     sessionStorage.removeItem(AUTH_SESS_KEY);
   }
@@ -6074,7 +6117,7 @@ async function authSignIn() {
   // Check locally-stored personal password first
   const local = JSON.parse(localStorage.getItem(AUTH_PW_PREFIX + email) || 'null');
   if (local?.version === user.version && hash === local.hash) {
-    sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email }));
+    sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email, logged: true }));
     btn.disabled = false; ldEl.style.display = 'none';
     _logAccess(email);
     _showApp(email); return;
@@ -6105,16 +6148,18 @@ async function authSetPassword() {
   if (pw1 !== pw2)    { _authErr(errEl, 'Passwords do not match.'); return; }
   const hash = await _sha256(pw1);
   localStorage.setItem(AUTH_PW_PREFIX + _cpEmail, JSON.stringify({ hash, version: _cpVersion }));
-  sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email: _cpEmail }));
+  sessionStorage.setItem(AUTH_SESS_KEY, JSON.stringify({ email: _cpEmail, logged: true }));
   _logAccess(_cpEmail);
   _showApp(_cpEmail);
 }
 
 function _showApp(email) {
+  CURRENT_USER_EMAIL = email;
   document.getElementById('auth-overlay').style.display = 'none';
   document.getElementById('auth-user-name').textContent = email;
   document.getElementById('auth-user-name').title = email;
   document.getElementById('auth-user-pill').style.display = 'flex';
+  renderDataMeta();
 }
 
 async function _logAccess(email) {

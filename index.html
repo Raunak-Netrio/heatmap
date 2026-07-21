@@ -4915,7 +4915,7 @@ function render() {
       if (a > 0) { const or = hrOp[h] / a; if (or > bestHOR) { bestHOR = or; bestH = h; } }
     }
     document.getElementById('peakHourLabel').textContent = 'Peak Load Hour';
-    document.getElementById('peakHour').textContent = bestH ? `Hour ${bestH - 1} (OR ${bestHOR.toFixed(2)})` : '—';
+    document.getElementById('peakHour').textContent = bestH ? `Hour ${tzHourLabel(bestH)} (OR ${bestHOR.toFixed(2)})` : '—';
 
     let bestDK = null, bestDOR = 0;
     DATES.forEach(({ key }) => {
@@ -4929,7 +4929,7 @@ function render() {
     const peakDayObj = peakDayKey ? DATES.find(d => d.key === peakDayKey) : null;
     document.getElementById('totalCount').textContent = grandTotal.toLocaleString();
     document.getElementById('totalLabel').textContent  = isAvail ? 'Staff-Hours' : 'Total Cases';
-    document.getElementById('peakHour').textContent   = peakHourKey && peakHourVal > 0 ? `Hour ${parseInt(peakHourKey) - 1} (${peakHourVal})` : '—';
+    document.getElementById('peakHour').textContent   = peakHourKey && peakHourVal > 0 ? `Hour ${tzHourLabel(parseInt(peakHourKey))} (${peakHourVal})` : '—';
     document.getElementById('peakHourLabel').textContent = isAvail ? 'Busiest Hour' : 'Peak Hour';
     document.getElementById('peakDay').textContent    = peakDayObj && peakDayVal > 0 ? `${peakDayObj.label} (${peakDayVal})` : '—';
     document.getElementById('peakDayLabel').textContent  = isAvail ? 'Busiest Day' : 'Peak Day';

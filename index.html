@@ -5344,6 +5344,7 @@ function _clearAll() {
   saveDataMeta('Cleared all data');
   localStorage.removeItem('hm_excel');
   localStorage.removeItem('hm_tickets');
+  localStorage.removeItem('hm_resolved_by');
   localStorage.setItem('hm_erased', JSON.stringify(['all']));
   location.reload();
 }
@@ -5367,6 +5368,13 @@ function _clearMonth() {
     const tickets = JSON.parse(localStorage.getItem('hm_tickets') || 'null');
     if (tickets) {
       localStorage.setItem('hm_tickets', JSON.stringify(tickets.filter(t => !t.date.startsWith(ym))));
+    }
+    const resolvedBy = JSON.parse(localStorage.getItem('hm_resolved_by') || 'null');
+    if (resolvedBy) {
+      Object.values(resolvedBy).forEach(grpDates => {
+        Object.keys(grpDates).filter(isMatch).forEach(d => delete grpDates[d]);
+      });
+      localStorage.setItem('hm_resolved_by', JSON.stringify(resolvedBy));
     }
     // Mark this month as erased so built-in data is also hidden after reload
     const erased = JSON.parse(localStorage.getItem('hm_erased') || '[]');
@@ -5443,12 +5451,13 @@ function parseServiceNowRows(rows) {
          return (lc.includes('resolved') || lc.includes('closed') || lc.includes('resolve'))
            && !lc.includes('by') && !lc.includes('note') && !lc.includes('comment') && !lc.includes('code') && !lc.includes('reason');
        });
-  const groupCol  = findCol('assignment group','assignment_group','group','team','queue');
-  const catCol    = findCol('category','cat','class');
-  const descCol   = findCol('short description','short_desc','subject','summary','title','description');
-  const prioCol   = findCol('priority','prio','urgency','severity');
-  const typeCol   = findCol('type','call type','incident type','contact type','request type');
-  const stateCol  = findCol('state','status','ticket status');
+  const groupCol       = findCol('assignment group','assignment_group','group','team','queue');
+  const catCol         = findCol('category','cat','class');
+  const descCol        = findCol('short description','short_desc','subject','summary','title','description');
+  const prioCol        = findCol('priority','prio','urgency','severity');
+  const typeCol        = findCol('type','call type','incident type','contact type','request type');
+  const stateCol       = findCol('state','status','ticket status');
+  const resolvedByCol  = findCol('resolved by','closed by','resolved_by','closed_by','resolver');
   const numCol    = cols.find(c => /^number$/i.test(c.trim()))
                  || findCol('case number','case_number','ticket number','ticket_number','case no','ticket no','case id','ticket id');
   // "Case" column in ServiceNow exports holds "Short Description CSNNNNN" combined
@@ -5516,9 +5525,15 @@ function parseServiceNowRows(rows) {
     if (!obj[grp][date]) obj[grp][date] = {};
     obj[grp][date][hour] = (obj[grp][date][hour]||0) + 1;
   }
+  function incNamed(obj, grp, date, hour, name) {
+    if (!obj[grp]) obj[grp] = {};
+    if (!obj[grp][date]) obj[grp][date] = {};
+    if (!obj[grp][date][hour]) obj[grp][date][hour] = {};
+    obj[grp][date][hour][name] = (obj[grp][date][hour][name] || 0) + 1;
+  }
 
   let cntO = 0, cntR = 0;
-  const newOpened = {}, newResolved = {};
+  const newOpened = {}, newResolved = {}, newResolvedBy = {};
   RAW_TICKETS = []; // reset on each upload
 
   for (const row of rows) {
@@ -5544,7 +5559,14 @@ function parseServiceNowRows(rows) {
 
     if (resolvedCol) {
       const rv = parseDT(row[resolvedCol]);
-      if (rv) { inc(newResolved,'All',rv.dateKey,rv.hourKey); inc(newResolved,grp,rv.dateKey,rv.hourKey); cntR++; }
+      if (rv) {
+        inc(newResolved,'All',rv.dateKey,rv.hourKey); inc(newResolved,grp,rv.dateKey,rv.hourKey); cntR++;
+        if (resolvedByCol) {
+          const analyst = String(row[resolvedByCol] || '').trim() || 'Unknown';
+          incNamed(newResolvedBy,'All',rv.dateKey,rv.hourKey,analyst);
+          incNamed(newResolvedBy,grp,rv.dateKey,rv.hourKey,analyst);
+        }
+      }
     }
   }
 
@@ -5586,6 +5608,28 @@ function parseServiceNowRows(rows) {
     }
     localStorage.setItem('hm_excel', JSON.stringify(stored));
   } catch(e) { console.warn('localStorage save failed:', e); }
+
+  // Update RESOLVED_BY with uploaded analyst data and persist
+  if (Object.keys(newResolvedBy).length) {
+    uploadedDates.forEach(d => {
+      Object.keys(RESOLVED_BY).forEach(g => { if (RESOLVED_BY[g]) delete RESOLVED_BY[g][d]; });
+    });
+    for (const [g, dates] of Object.entries(newResolvedBy)) {
+      if (!RESOLVED_BY[g]) RESOLVED_BY[g] = {};
+      Object.assign(RESOLVED_BY[g], dates);
+    }
+    try {
+      const storedRB = JSON.parse(localStorage.getItem('hm_resolved_by') || '{}');
+      uploadedDates.forEach(d => {
+        Object.keys(storedRB).forEach(g => { if (storedRB[g]) delete storedRB[g][d]; });
+      });
+      for (const [g, dates] of Object.entries(newResolvedBy)) {
+        if (!storedRB[g]) storedRB[g] = {};
+        Object.assign(storedRB[g], dates);
+      }
+      localStorage.setItem('hm_resolved_by', JSON.stringify(storedRB));
+    } catch(e) {}
+  }
 
   // Persist ticket list so cell-detail works after page reload
   try { localStorage.setItem('hm_tickets', JSON.stringify(RAW_TICKETS)); } catch(e) {}
@@ -5953,6 +5997,7 @@ function restoreUploads() {
       (excel.wipedDates || []).forEach(d => {
         Object.keys(DATA.opened).forEach(g => { delete DATA.opened[g][d]; });
         Object.keys(DATA.resolved).forEach(g => { delete DATA.resolved[g][d]; });
+        Object.keys(RESOLVED_BY).forEach(g => { if (RESOLVED_BY[g]) delete RESOLVED_BY[g][d]; });
       });
       for (const [g, dates] of Object.entries(excel.opened || {})) {
         if (!DATA.opened[g]) DATA.opened[g] = {};
@@ -5995,6 +6040,17 @@ function restoreUploads() {
       }
     }
   } catch(e) { console.warn('localStorage avail restore failed:', e); }
+
+  try {
+    const rb = JSON.parse(localStorage.getItem('hm_resolved_by') || 'null');
+    if (rb) {
+      for (const [g, dates] of Object.entries(rb)) {
+        if (!RESOLVED_BY[g]) RESOLVED_BY[g] = {};
+        Object.assign(RESOLVED_BY[g], dates);
+      }
+    }
+  } catch(e) { console.warn('localStorage resolved_by restore failed:', e); }
+
   renderDataMeta();
 }
 
